@@ -5,7 +5,7 @@ pnpm-lock.yaml
 yarn.lock
 
 # Build output
-dist/
+
 build/
 
 # Environment variables
