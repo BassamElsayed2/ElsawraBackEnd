@@ -11,22 +11,15 @@ import { pool } from "./config/database";
 dotenv.config();
 
 const app: Express = express();
-const PORT = process.env.PORT || 4015;
+const PORT = process.env.PORT;
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:4016",
-  process.env.DASHBOARD_URL || "http://localhost:4017",
-  "http://localhost:4016",
-  "http://localhost:4017",
-].filter(Boolean);
-
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
