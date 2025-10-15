@@ -12,7 +12,7 @@ dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT;
-app.set("trust proxy", "127.0.0.1");
+app.set("trust proxy", 1);
 // Security middleware
 app.use(helmet());
 
