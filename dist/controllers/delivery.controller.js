@@ -1,164 +1,67 @@
 "use strict";
+var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DeliveryController = void 0;
-const database_1 = require("../config/database");
-const logger_1 = require("../utils/logger");
+const delivery_service_1 = require("../services/delivery.service");
+const error_middleware_1 = require("../middleware/error.middleware");
 class DeliveryController {
-    // Calculate distance between two coordinates (Haversine formula)
-    static calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371; // Earth's radius in kilometers
-        const dLat = this.deg2rad(lat2 - lat1);
-        const dLon = this.deg2rad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.deg2rad(lat1)) *
-                Math.cos(this.deg2rad(lat2)) *
-                Math.sin(dLon / 2) *
-                Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-    static deg2rad(deg) {
-        return deg * (Math.PI / 180);
-    }
-    // Get nearest branch
-    static async getNearestBranch(req, res, next) {
-        try {
-            const { latitude, longitude } = req.body;
-            if (!latitude || !longitude) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Latitude and longitude are required",
-                });
-            }
-            // Get all branches
-            const result = await database_1.pool.request().query(`
-        SELECT 
-          id,
-          name,
-          name_en,
-          latitude,
-          longitude,
-          delivery_fee_per_km,
-          max_delivery_distance
-        FROM branches
-        WHERE is_active = 1
-      `);
-            const branches = result.recordset;
-            if (branches.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: "No active branches found",
-                });
-            }
-            // Find nearest branch
-            let nearestBranch = null;
-            let minDistance = Infinity;
-            for (const branch of branches) {
-                const distance = this.calculateDistance(latitude, longitude, branch.latitude, branch.longitude);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    nearestBranch = {
-                        ...branch,
-                        distance: Math.round(distance * 100) / 100,
-                    };
-                }
-            }
-            res.status(200).json({
-                success: true,
-                data: nearestBranch,
-            });
-        }
-        catch (error) {
-            logger_1.logger.error("Error getting nearest branch:", error);
-            next(error);
-        }
-    }
-    // Calculate delivery fee
-    static async calculateDeliveryFee(req, res, next) {
-        try {
-            const { latitude, longitude } = req.body;
-            if (!latitude || !longitude) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Latitude and longitude are required",
-                });
-            }
-            // Get all branches
-            const result = await database_1.pool.request().query(`
-        SELECT 
-          id,
-          name,
-          name_en,
-          latitude,
-          longitude,
-          delivery_fee_per_km,
-          max_delivery_distance
-        FROM branches
-        WHERE is_active = 1
-      `);
-            const branches = result.recordset;
-            if (branches.length === 0) {
-                return res.status(404).json({
-                    success: false,
-                    message: "No active branches found",
-                });
-            }
-            // Find nearest branch
-            let nearestBranch = null;
-            let minDistance = Infinity;
-            for (const branch of branches) {
-                const distance = this.calculateDistance(latitude, longitude, branch.latitude, branch.longitude);
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    nearestBranch = branch;
-                }
-            }
-            if (!nearestBranch) {
-                return res.status(404).json({
-                    success: false,
-                    message: "No branch found",
-                });
-            }
-            const distance = minDistance;
-            // Check if within delivery range
-            if (distance > nearestBranch.max_delivery_distance) {
-                return res.status(200).json({
-                    success: true,
-                    data: {
-                        fee: 0,
-                        distance: Math.round(distance * 100) / 100,
-                        available: false,
-                        message: "Outside delivery area",
-                        branch: {
-                            id: nearestBranch.id,
-                            name: nearestBranch.name,
-                            name_en: nearestBranch.name_en,
-                        },
-                    },
-                });
-            }
-            const fee = Math.round(distance * nearestBranch.delivery_fee_per_km * 100) / 100;
-            res.status(200).json({
-                success: true,
-                data: {
-                    fee,
-                    distance: Math.round(distance * 100) / 100,
-                    available: true,
-                    branch: {
-                        id: nearestBranch.id,
-                        name: nearestBranch.name,
-                        name_en: nearestBranch.name_en,
-                        latitude: nearestBranch.latitude,
-                        longitude: nearestBranch.longitude,
-                    },
-                },
-            });
-        }
-        catch (error) {
-            logger_1.logger.error("Error calculating delivery fee:", error);
-            next(error);
-        }
-    }
 }
 exports.DeliveryController = DeliveryController;
+_a = DeliveryController;
+// Calculate delivery fee
+DeliveryController.calculateDeliveryFee = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const { user_latitude, user_longitude, branch_id } = req.body;
+    const result = await delivery_service_1.DeliveryService.calculateDeliveryFee({
+        user_latitude,
+        user_longitude,
+        branch_id,
+    });
+    res.json({
+        success: true,
+        data: result,
+    });
+});
+// Get all delivery fee configurations (admin)
+DeliveryController.getDeliveryFeeConfigs = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const configs = await delivery_service_1.DeliveryService.getDeliveryFeeConfigs();
+    res.json({
+        success: true,
+        data: { configs },
+    });
+});
+// Create delivery fee configuration (admin)
+DeliveryController.createDeliveryFeeConfig = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const config = await delivery_service_1.DeliveryService.createDeliveryFeeConfig(req.body);
+    res.status(201).json({
+        success: true,
+        message: "Delivery fee configuration created successfully",
+        data: { config },
+    });
+});
+// Update delivery fee configuration (admin)
+DeliveryController.updateDeliveryFeeConfig = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const { id } = req.params;
+    // Log the received data for debugging
+    console.log("Update delivery fee config request:", {
+        id,
+        body: req.body,
+        bodyType: typeof req.body,
+        keys: Object.keys(req.body),
+    });
+    const config = await delivery_service_1.DeliveryService.updateDeliveryFeeConfig(id, req.body);
+    res.json({
+        success: true,
+        message: "Delivery fee configuration updated successfully",
+        data: { config },
+    });
+});
+// Delete delivery fee configuration (admin)
+DeliveryController.deleteDeliveryFeeConfig = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const { id } = req.params;
+    await delivery_service_1.DeliveryService.deleteDeliveryFeeConfig(id);
+    res.json({
+        success: true,
+        message: "Delivery fee configuration deleted successfully",
+    });
+});
 //# sourceMappingURL=delivery.controller.js.map

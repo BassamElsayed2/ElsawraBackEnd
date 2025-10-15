@@ -53,6 +53,7 @@ exports.getOrdersQuerySchema = zod_1.z.object({
         "cancelled",
     ])
         .optional(),
+    order_id: zod_1.z.string().optional(),
 });
 exports.getOrderStatsQuerySchema = zod_1.z
     .object({

@@ -104,8 +104,8 @@ class OrdersService {
     static async updateOrderStatus(orderId, status) {
         await database_1.pool
             .request()
-            .input("orderId", orderId)
-            .input("status", status)
+            .input("order_id", mssql_1.default.UniqueIdentifier, orderId)
+            .input("status", mssql_1.default.NVarChar(20), status)
             .execute("sp_UpdateOrderStatus");
         return await this.getOrderById(orderId);
     }
@@ -127,23 +127,28 @@ class OrdersService {
         }
         await database_1.pool
             .request()
-            .input("orderId", orderId)
-            .input("status", "cancelled")
+            .input("order_id", mssql_1.default.UniqueIdentifier, orderId)
+            .input("status", mssql_1.default.NVarChar(20), "cancelled")
             .execute("sp_UpdateOrderStatus");
         return await this.getOrderById(orderId, userId);
     }
     // Get all orders (admin)
-    static async getAllOrders(page = 1, limit = 10, status) {
+    static async getAllOrders(page = 1, limit = 10, status, orderId) {
         const offset = (page - 1) * limit;
         const request = database_1.pool
             .request()
             .input("offset", offset)
             .input("limit", limit);
-        let statusCondition = "";
+        const conditions = [];
         if (status) {
-            statusCondition = "WHERE o.status = @status";
+            conditions.push("o.status = @status");
             request.input("status", status);
         }
+        if (orderId) {
+            conditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
+            request.input("orderId", `%${orderId}%`);
+        }
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
         const ordersResult = await request.query(`
       SELECT 
         o.*,
@@ -154,7 +159,7 @@ class OrdersService {
       LEFT JOIN profiles p ON o.user_id = p.user_id
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN branches b ON o.branch_id = b.id
-      ${statusCondition}
+      ${whereClause}
       ORDER BY o.created_at DESC
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
@@ -168,8 +173,22 @@ class OrdersService {
         if (status) {
             countRequest.input("status", status);
         }
+        if (orderId) {
+            countRequest.input("orderId", `%${orderId}%`);
+        }
+        // Reconstruct where clause for count query
+        const countConditions = [];
+        if (status) {
+            countConditions.push("o.status = @status");
+        }
+        if (orderId) {
+            countConditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
+        }
+        const countWhereClause = countConditions.length > 0
+            ? `WHERE ${countConditions.join(" AND ")}`
+            : "";
         const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total FROM orders ${statusCondition}
+      SELECT COUNT(*) as total FROM orders o ${countWhereClause}
     `);
         const total = countResult.recordset[0].total;
         return {
@@ -201,7 +220,11 @@ class OrdersService {
       SELECT 
         COUNT(*) as total_orders,
         SUM(CASE WHEN o.status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
-        SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN o.status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_orders,
+        SUM(CASE WHEN o.status = 'preparing' THEN 1 ELSE 0 END) as preparing_orders,
+        SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END) as ready_orders,
+        SUM(CASE WHEN o.status = 'delivering' THEN 1 ELSE 0 END) as delivering_orders,
+        SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN 1 ELSE 0 END) as delivered_orders,
         SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_orders,
         COALESCE(SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN o.total ELSE 0 END), 0) as total_revenue,
         COALESCE(AVG(CASE WHEN o.status IN ('delivered', 'completed') THEN o.total ELSE NULL END), 0) as average_order_value

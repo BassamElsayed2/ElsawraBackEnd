@@ -8,9 +8,10 @@ BEGIN
         address_ar NVARCHAR(500) NOT NULL,
         address_en NVARCHAR(500) NOT NULL,
         phone NVARCHAR(20),
-        email NVARCHAR(100),
-        latitude DECIMAL(10, 8),
-        longitude DECIMAL(11, 8),
+        
+        lat DECIMAL(10, 8),
+        lng DECIMAL(11, 8),
+        image_url NVARCHAR(MAX),
         is_active BIT DEFAULT 1,
         created_at DATETIME2 DEFAULT GETUTCDATE(),
         updated_at DATETIME2 DEFAULT GETUTCDATE()
@@ -28,16 +29,5 @@ BEGIN
 END
 GO
 
--- Insert sample data (optional)
-IF NOT EXISTS (SELECT * FROM branches)
-BEGIN
-    INSERT INTO branches (name_ar, name_en, address_ar, address_en, phone, email, is_active)
-    VALUES 
-        (N'الفرع الرئيسي', 'Main Branch', N'شارع الملك فهد، الرياض', '123 King Fahd Road, Riyadh', '+966 11 234 5678', 'main@restaurant.com', 1),
-        (N'فرع الدمام', 'Dammam Branch', N'شارع الظهران، الدمام', 'Dhahran Street, Dammam', '+966 13 234 5678', 'dammam@restaurant.com', 1),
-        (N'فرع جدة', 'Jeddah Branch', N'طريق المدينة، جدة', 'Madinah Road, Jeddah', '+966 12 234 5678', 'jeddah@restaurant.com', 1);
-    
-    PRINT 'Sample branches inserted';
-END
-GO
+
 

@@ -74,8 +74,19 @@ OrdersController.updateOrderStatus = (0, error_middleware_1.asyncHandler)(async 
 });
 // Get all orders (admin)
 OrdersController.getAllOrders = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const { page, limit, status } = req.query;
-    const result = await orders_service_1.OrdersService.getAllOrders(parseInt(page) || 1, parseInt(limit) || 10, status);
+    const { page, limit, status, order_id } = req.query;
+    console.log("📋 Orders Query Parameters:", {
+        page,
+        limit,
+        status,
+        order_id,
+    });
+    const result = await orders_service_1.OrdersService.getAllOrders(parseInt(page) || 1, parseInt(limit) || 10, status, order_id);
+    console.log("📦 Orders Result:", {
+        totalOrders: result.orders.length,
+        total: result.total,
+        searchedOrderId: order_id,
+    });
     res.json({
         success: true,
         data: result,

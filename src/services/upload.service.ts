@@ -77,7 +77,7 @@ export class UploadService {
   // Get file URL
   static getFileUrl(filePath: string): string {
     const uploadsDir = process.env.UPLOAD_DIR || "./uploads";
-    const apiUrl = process.env.API_URL || "http://localhost:5000";
+    const apiUrl = process.env.API_URL;
 
     // Convert backslashes to forward slashes
     let relativePath = filePath.replace(/\\/g, "/");

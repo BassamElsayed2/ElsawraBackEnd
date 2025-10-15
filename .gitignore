@@ -28,9 +28,7 @@ Thumbs.db
 *.swo
 *~
 
-# Uploads
-uploads/*
-!uploads/.gitkeep
+
 
 # Testing
 coverage/

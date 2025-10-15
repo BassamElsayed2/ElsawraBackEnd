@@ -131,8 +131,8 @@ export class OrdersService {
   static async updateOrderStatus(orderId: string, status: string) {
     await pool
       .request()
-      .input("orderId", orderId)
-      .input("status", status)
+      .input("order_id", sql.UniqueIdentifier, orderId)
+      .input("status", sql.NVarChar(20), status)
       .execute("sp_UpdateOrderStatus");
 
     return await this.getOrderById(orderId);
@@ -162,8 +162,8 @@ export class OrdersService {
 
     await pool
       .request()
-      .input("orderId", orderId)
-      .input("status", "cancelled")
+      .input("order_id", sql.UniqueIdentifier, orderId)
+      .input("status", sql.NVarChar(20), "cancelled")
       .execute("sp_UpdateOrderStatus");
 
     return await this.getOrderById(orderId, userId);
@@ -173,7 +173,8 @@ export class OrdersService {
   static async getAllOrders(
     page: number = 1,
     limit: number = 10,
-    status?: string
+    status?: string,
+    orderId?: string
   ) {
     const offset = (page - 1) * limit;
     const request = pool
@@ -181,11 +182,20 @@ export class OrdersService {
       .input("offset", offset)
       .input("limit", limit);
 
-    let statusCondition = "";
+    const conditions: string[] = [];
+
     if (status) {
-      statusCondition = "WHERE o.status = @status";
+      conditions.push("o.status = @status");
       request.input("status", status);
     }
+
+    if (orderId) {
+      conditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
+      request.input("orderId", `%${orderId}%`);
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
     const ordersResult = await request.query(`
       SELECT 
@@ -197,7 +207,7 @@ export class OrdersService {
       LEFT JOIN profiles p ON o.user_id = p.user_id
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN branches b ON o.branch_id = b.id
-      ${statusCondition}
+      ${whereClause}
       ORDER BY o.created_at DESC
       OFFSET @offset ROWS
       FETCH NEXT @limit ROWS ONLY
@@ -213,9 +223,25 @@ export class OrdersService {
     if (status) {
       countRequest.input("status", status);
     }
+    if (orderId) {
+      countRequest.input("orderId", `%${orderId}%`);
+    }
+
+    // Reconstruct where clause for count query
+    const countConditions: string[] = [];
+    if (status) {
+      countConditions.push("o.status = @status");
+    }
+    if (orderId) {
+      countConditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
+    }
+    const countWhereClause =
+      countConditions.length > 0
+        ? `WHERE ${countConditions.join(" AND ")}`
+        : "";
 
     const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total FROM orders ${statusCondition}
+      SELECT COUNT(*) as total FROM orders o ${countWhereClause}
     `);
 
     const total = countResult.recordset[0].total;
@@ -260,7 +286,11 @@ export class OrdersService {
       SELECT 
         COUNT(*) as total_orders,
         SUM(CASE WHEN o.status = 'pending' THEN 1 ELSE 0 END) as pending_orders,
-        SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN 1 ELSE 0 END) as completed_orders,
+        SUM(CASE WHEN o.status = 'confirmed' THEN 1 ELSE 0 END) as confirmed_orders,
+        SUM(CASE WHEN o.status = 'preparing' THEN 1 ELSE 0 END) as preparing_orders,
+        SUM(CASE WHEN o.status = 'ready' THEN 1 ELSE 0 END) as ready_orders,
+        SUM(CASE WHEN o.status = 'delivering' THEN 1 ELSE 0 END) as delivering_orders,
+        SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN 1 ELSE 0 END) as delivered_orders,
         SUM(CASE WHEN o.status = 'cancelled' THEN 1 ELSE 0 END) as cancelled_orders,
         COALESCE(SUM(CASE WHEN o.status IN ('delivered', 'completed') THEN o.total ELSE 0 END), 0) as total_revenue,
         COALESCE(AVG(CASE WHEN o.status IN ('delivered', 'completed') THEN o.total ELSE NULL END), 0) as average_order_value

@@ -100,13 +100,27 @@ export class OrdersController {
   // Get all orders (admin)
   static getAllOrders = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {
-      const { page, limit, status } = req.query as any;
+      const { page, limit, status, order_id } = req.query as any;
+
+      console.log("📋 Orders Query Parameters:", {
+        page,
+        limit,
+        status,
+        order_id,
+      });
 
       const result = await OrdersService.getAllOrders(
         parseInt(page) || 1,
         parseInt(limit) || 10,
-        status
+        status,
+        order_id
       );
+
+      console.log("📦 Orders Result:", {
+        totalOrders: result.orders.length,
+        total: result.total,
+        searchedOrderId: order_id,
+      });
 
       res.json({
         success: true,
