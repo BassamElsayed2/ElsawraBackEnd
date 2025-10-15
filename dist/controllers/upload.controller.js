@@ -20,10 +20,9 @@ exports.uploadController = {
             }
             // Get file info
             const file = req.file;
-            // Build full URL for the image
-            const protocol = req.protocol;
-            const host = req.get("host");
-            const imageUrl = `${protocol}://${host}/uploads/${file.filename}`;
+            // Build full URL for the image using API_URL from environment
+            const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+            const imageUrl = `${apiUrl}/uploads/${file.filename}`;
             logger_1.logger.info(`Image uploaded: ${file.filename}`);
             res.status(200).json({
                 success: true,
@@ -58,10 +57,9 @@ exports.uploadController = {
             }
             // Get file info
             const file = req.file;
-            // Build full URL for the image
-            const protocol = req.protocol;
-            const host = req.get("host");
-            const imageUrl = `${protocol}://${host}/uploads/${file.filename}`;
+            // Build full URL for the image using API_URL from environment
+            const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+            const imageUrl = `${apiUrl}/uploads/${file.filename}`;
             logger_1.logger.info(`Branch image uploaded: ${file.filename}`);
             res.status(200).json({
                 success: true,
