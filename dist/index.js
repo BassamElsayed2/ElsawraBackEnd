@@ -17,7 +17,7 @@ const database_1 = require("./config/database");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT;
-app.set("trust proxy", true);
+app.set("trust proxy", "127.0.0.1");
 // Security middleware
 app.use((0, helmet_1.default)());
 // CORS configuration
