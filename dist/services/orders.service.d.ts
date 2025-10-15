@@ -21,7 +21,7 @@ export declare class OrdersService {
     static createOrder(userId: string, data: CreateOrderData): Promise<any>;
     static updateOrderStatus(orderId: string, status: string): Promise<any>;
     static cancelOrder(orderId: string, userId: string): Promise<any>;
-    static getAllOrders(page?: number, limit?: number, status?: string): Promise<{
+    static getAllOrders(page?: number, limit?: number, status?: string, orderId?: string): Promise<{
         orders: any[];
         total: any;
         page: number;

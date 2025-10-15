@@ -106,14 +106,17 @@ export declare const getOrdersQuerySchema: z.ZodObject<{
     page: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
     limit: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
     status: z.ZodOptional<z.ZodEnum<["pending", "confirmed", "preparing", "ready", "delivering", "delivered", "cancelled"]>>;
+    order_id: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     limit?: number;
     status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     page?: number;
+    order_id?: string;
 }, {
     limit?: string;
     status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     page?: string;
+    order_id?: string;
 }>;
 export declare const getOrderStatsQuerySchema: z.ZodOptional<z.ZodObject<{
     start_date: z.ZodOptional<z.ZodString>;

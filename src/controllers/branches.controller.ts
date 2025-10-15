@@ -16,7 +16,7 @@ export const branchesController = {
       let query = `
         SELECT 
           id, name_ar, name_en, address_ar, address_en,
-          phone, email, lat, lng, image_url, is_active,
+          phone,  lat, lng, image_url, is_active,
           created_at, updated_at
         FROM branches
         WHERE 1=1
@@ -66,7 +66,7 @@ export const branchesController = {
         .query(`
           SELECT 
             id, name_ar, name_en, address_ar, address_en,
-            phone, email, lat, lng, image_url, is_active,
+            phone,  lat, lng, image_url, is_active,
             created_at, updated_at
           FROM branches
           WHERE id = @id
@@ -103,7 +103,7 @@ export const branchesController = {
         address_ar,
         address_en,
         phone,
-        email,
+
         lat,
         lng,
         image_url,
@@ -117,19 +117,19 @@ export const branchesController = {
         .input("address_ar", sql.NVarChar, address_ar)
         .input("address_en", sql.NVarChar, address_en)
         .input("phone", sql.NVarChar, phone || null)
-        .input("email", sql.NVarChar, email || null)
+
         .input("lat", sql.Decimal(10, 8), lat || 0)
         .input("lng", sql.Decimal(11, 8), lng || 0)
         .input("image_url", sql.NVarChar, image_url || null)
         .input("is_active", sql.Bit, is_active ? 1 : 0).query(`
           INSERT INTO branches (
             name_ar, name_en, address_ar, address_en,
-            phone, email, lat, lng, image_url, is_active
+            phone,  lat, lng, image_url, is_active
           )
           OUTPUT INSERTED.*
           VALUES (
             @name_ar, @name_en, @address_ar, @address_en,
-            @phone, @email, @lat, @lng, @image_url, @is_active
+            @phone,  @lat, @lng, @image_url, @is_active
           )
         `);
 
@@ -160,7 +160,7 @@ export const branchesController = {
         address_ar,
         address_en,
         phone,
-        email,
+
         lat,
         lng,
         image_url,
@@ -191,10 +191,7 @@ export const branchesController = {
         updates.push("phone = @phone");
         request.input("phone", sql.NVarChar, phone);
       }
-      if (email !== undefined) {
-        updates.push("email = @email");
-        request.input("email", sql.NVarChar, email);
-      }
+
       if (lat !== undefined) {
         updates.push("lat = @lat");
         request.input("lat", sql.Decimal(10, 8), lat);

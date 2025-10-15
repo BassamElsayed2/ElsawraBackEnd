@@ -54,6 +54,7 @@ export const getOrdersQuerySchema = z.object({
       "cancelled",
     ])
     .optional(),
+  order_id: z.string().optional(),
 });
 
 export const getOrderStatsQuerySchema = z

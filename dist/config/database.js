@@ -19,7 +19,7 @@ const config = {
         encrypt: process.env.DB_ENCRYPT === "true",
         trustServerCertificate: process.env.DB_TRUST_SERVER_CERTIFICATE === "true",
         enableArithAbort: true,
-        connectionTimeout: 30000,
+        connectTimeout: 30000,
         requestTimeout: 30000,
     },
     pool: {

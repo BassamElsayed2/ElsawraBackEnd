@@ -15,7 +15,7 @@ exports.branchesController = {
             let query = `
         SELECT 
           id, name_ar, name_en, address_ar, address_en,
-          phone, email, lat, lng, image_url, is_active,
+          phone,  lat, lng, image_url, is_active,
           created_at, updated_at
         FROM branches
         WHERE 1=1
@@ -54,7 +54,7 @@ exports.branchesController = {
                 .query(`
           SELECT 
             id, name_ar, name_en, address_ar, address_en,
-            phone, email, lat, lng, image_url, is_active,
+            phone,  lat, lng, image_url, is_active,
             created_at, updated_at
           FROM branches
           WHERE id = @id
@@ -79,7 +79,7 @@ exports.branchesController = {
     // Create new branch
     createBranch: async (req, res, next) => {
         try {
-            const { name_ar, name_en, address_ar, address_en, phone, email, lat, lng, image_url, is_active = true, } = req.body;
+            const { name_ar, name_en, address_ar, address_en, phone, lat, lng, image_url, is_active = true, } = req.body;
             const result = await database_1.pool
                 .request()
                 .input("name_ar", mssql_1.default.NVarChar, name_ar)
@@ -87,19 +87,18 @@ exports.branchesController = {
                 .input("address_ar", mssql_1.default.NVarChar, address_ar)
                 .input("address_en", mssql_1.default.NVarChar, address_en)
                 .input("phone", mssql_1.default.NVarChar, phone || null)
-                .input("email", mssql_1.default.NVarChar, email || null)
                 .input("lat", mssql_1.default.Decimal(10, 8), lat || 0)
                 .input("lng", mssql_1.default.Decimal(11, 8), lng || 0)
                 .input("image_url", mssql_1.default.NVarChar, image_url || null)
                 .input("is_active", mssql_1.default.Bit, is_active ? 1 : 0).query(`
           INSERT INTO branches (
             name_ar, name_en, address_ar, address_en,
-            phone, email, lat, lng, image_url, is_active
+            phone,  lat, lng, image_url, is_active
           )
           OUTPUT INSERTED.*
           VALUES (
             @name_ar, @name_en, @address_ar, @address_en,
-            @phone, @email, @lat, @lng, @image_url, @is_active
+            @phone,  @lat, @lng, @image_url, @is_active
           )
         `);
             logger_1.logger.info(`Branch created: ${result.recordset[0].id}`);
@@ -118,7 +117,7 @@ exports.branchesController = {
     updateBranch: async (req, res, next) => {
         try {
             const { id } = req.params;
-            const { name_ar, name_en, address_ar, address_en, phone, email, lat, lng, image_url, is_active, } = req.body;
+            const { name_ar, name_en, address_ar, address_en, phone, lat, lng, image_url, is_active, } = req.body;
             const request = database_1.pool.request().input("id", mssql_1.default.UniqueIdentifier, id);
             const updates = [];
             if (name_ar !== undefined) {
@@ -140,10 +139,6 @@ exports.branchesController = {
             if (phone !== undefined) {
                 updates.push("phone = @phone");
                 request.input("phone", mssql_1.default.NVarChar, phone);
-            }
-            if (email !== undefined) {
-                updates.push("email = @email");
-                request.input("email", mssql_1.default.NVarChar, email);
             }
             if (lat !== undefined) {
                 updates.push("lat = @lat");
