@@ -9,7 +9,7 @@ yarn.lock
 build/
 
 # Environment variables
-
+.env
 # Logs
 logs/
 *.log
