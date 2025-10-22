@@ -11,6 +11,7 @@ const router = (0, express_1.Router)();
 // Public routes (with rate limiting)
 router.post("/signup", rate_limit_middleware_1.authLimiter, (0, validation_middleware_1.validateBody)(auth_validators_1.signUpSchema), auth_controller_1.AuthController.signUp);
 router.post("/signin", rate_limit_middleware_1.authLimiter, (0, validation_middleware_1.validateBody)(auth_validators_1.signInSchema), auth_controller_1.AuthController.signIn);
+router.post("/google", rate_limit_middleware_1.authLimiter, (0, validation_middleware_1.validateBody)(zod_1.z.object({ idToken: zod_1.z.string().min(1) })), auth_controller_1.AuthController.googleSignIn);
 // Check if phone exists (public)
 router.post("/check-phone", (0, validation_middleware_1.validateBody)(zod_1.z.object({ phone: zod_1.z.string().min(1) })), auth_controller_1.AuthController.checkPhoneExists);
 // Protected routes

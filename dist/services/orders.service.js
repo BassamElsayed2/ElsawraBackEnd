@@ -8,6 +8,18 @@ const database_1 = require("../config/database");
 const error_middleware_1 = require("../middleware/error.middleware");
 const mssql_1 = __importDefault(require("mssql"));
 class OrdersService {
+    // Get user profile (for phone validation)
+    static async getUserProfile(userId) {
+        const result = await database_1.pool.request().input("userId", userId).query(`
+        SELECT phone
+        FROM profiles
+        WHERE user_id = @userId
+      `);
+        if (result.recordset.length === 0) {
+            throw new error_middleware_1.ApiError(404, "User profile not found");
+        }
+        return result.recordset[0];
+    }
     // Get user orders
     static async getUserOrders(userId, page = 1, limit = 10) {
         const offset = (page - 1) * limit;
@@ -23,7 +35,8 @@ class OrdersService {
         FROM orders o
         LEFT JOIN addresses a ON o.address_id = a.id
         LEFT JOIN branches b ON o.branch_id = b.id
-        WHERE o.user_id = @userId
+        WHERE o.user_id = @userId 
+          AND o.status != 'pending_payment'
         ORDER BY o.created_at DESC
         OFFSET @offset ROWS
         FETCH NEXT @limit ROWS ONLY
@@ -36,7 +49,7 @@ class OrdersService {
         const countResult = await database_1.pool
             .request()
             .input("userId", userId)
-            .query("SELECT COUNT(*) as total FROM orders WHERE user_id = @userId");
+            .query("SELECT COUNT(*) as total FROM orders WHERE user_id = @userId AND status != 'pending_payment'");
         const total = countResult.recordset[0].total;
         return {
             orders,
@@ -59,11 +72,13 @@ class OrdersService {
         o.*,
         p.full_name as customer_name, p.phone as customer_phone,
         a.title as address_name, a.street, a.building, a.floor, a.apartment, a.area, a.city, a.latitude, a.longitude, a.notes as address_notes,
-        b.name_ar as branch_name_ar, b.name_en as branch_name_en, b.address_ar as branch_address_ar, b.address_en as branch_address_en, b.phone as branch_phone
+        b.name_ar as branch_name_ar, b.name_en as branch_name_en, b.address_ar as branch_address_ar, b.address_en as branch_address_en, b.phone as branch_phone,
+        pay.callback_data as payment_callback_data
       FROM orders o
       LEFT JOIN profiles p ON o.user_id = p.user_id
       LEFT JOIN addresses a ON o.address_id = a.id
       LEFT JOIN branches b ON o.branch_id = b.id
+      LEFT JOIN payments pay ON o.id = pay.order_id
       WHERE o.id = @orderId ${userCondition}
     `);
         if (result.recordset.length === 0) {
@@ -71,6 +86,15 @@ class OrdersService {
         }
         const order = result.recordset[0];
         order.items = JSON.parse(order.items);
+        // Parse callback_data if available
+        if (order.payment_callback_data) {
+            try {
+                order.payment_callback_data = JSON.parse(order.payment_callback_data);
+            }
+            catch (e) {
+                // Keep as string if parsing fails
+            }
+        }
         return order;
     }
     // Create order
@@ -109,6 +133,47 @@ class OrdersService {
             .execute("sp_UpdateOrderStatus");
         return await this.getOrderById(orderId);
     }
+    // Mark order as paid (user)
+    static async markOrderAsPaid(orderId, userId) {
+        // Check if order belongs to user and is in pending_payment status
+        const checkResult = await database_1.pool
+            .request()
+            .input("orderId", mssql_1.default.UniqueIdentifier, orderId)
+            .input("userId", mssql_1.default.UniqueIdentifier, userId).query(`
+        SELECT id, status, payment_status 
+        FROM orders 
+        WHERE id = @orderId AND user_id = @userId
+      `);
+        if (checkResult.recordset.length === 0) {
+            throw new error_middleware_1.ApiError(404, "Order not found");
+        }
+        const order = checkResult.recordset[0];
+        // Debug logging
+        console.log("🔍 Mark Order As Paid - Debug Info:");
+        console.log("Order ID:", orderId);
+        console.log("User ID:", userId);
+        console.log("Current Status:", order.status);
+        console.log("Current Payment Status:", order.payment_status);
+        // Allow marking as paid if order is in pending_payment status OR if payment_status is pending
+        if (order.status !== "pending_payment" &&
+            order.payment_status !== "pending") {
+            console.log("❌ Order is not in pending_payment status and payment_status is not pending.");
+            console.log("Current status:", order.status, "Payment status:", order.payment_status);
+            throw new error_middleware_1.ApiError(400, `Order cannot be marked as paid. Status: ${order.status}, Payment Status: ${order.payment_status}`);
+        }
+        console.log("✅ Order can be marked as paid. Proceeding with update...");
+        // Update order to paid status
+        await database_1.pool.request().input("orderId", mssql_1.default.UniqueIdentifier, orderId).query(`
+        UPDATE orders 
+        SET 
+          payment_status = 'paid',
+          status = 'confirmed',
+          updated_at = GETDATE()
+        WHERE id = @orderId
+      `);
+        console.log("✅ Order successfully updated to paid status");
+        return await this.getOrderById(orderId);
+    }
     // Cancel order (user)
     static async cancelOrder(orderId, userId) {
         // Check if order belongs to user
@@ -133,7 +198,7 @@ class OrdersService {
         return await this.getOrderById(orderId, userId);
     }
     // Get all orders (admin)
-    static async getAllOrders(page = 1, limit = 10, status, orderId) {
+    static async getAllOrders(page = 1, limit = 10, status, orderId, customerName) {
         const offset = (page - 1) * limit;
         const request = database_1.pool
             .request()
@@ -144,9 +209,17 @@ class OrdersService {
             conditions.push("o.status = @status");
             request.input("status", status);
         }
+        else {
+            // إخفاء الطلبات pending_payment من Dashboard إلا إذا تم طلبها بشكل صريح
+            conditions.push("o.status != 'pending_payment'");
+        }
         if (orderId) {
             conditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
             request.input("orderId", `%${orderId}%`);
+        }
+        if (customerName) {
+            conditions.push("p.full_name LIKE @customerName");
+            request.input("customerName", `%${customerName}%`);
         }
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
         const ordersResult = await request.query(`
@@ -176,19 +249,32 @@ class OrdersService {
         if (orderId) {
             countRequest.input("orderId", `%${orderId}%`);
         }
+        if (customerName) {
+            countRequest.input("customerName", `%${customerName}%`);
+        }
         // Reconstruct where clause for count query
         const countConditions = [];
         if (status) {
             countConditions.push("o.status = @status");
         }
+        else {
+            // إخفاء الطلبات pending_payment من العدد أيضاً
+            countConditions.push("o.status != 'pending_payment'");
+        }
         if (orderId) {
             countConditions.push("CAST(o.id AS NVARCHAR(36)) LIKE @orderId");
+        }
+        if (customerName) {
+            countConditions.push("p.full_name LIKE @customerName");
         }
         const countWhereClause = countConditions.length > 0
             ? `WHERE ${countConditions.join(" AND ")}`
             : "";
         const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total FROM orders o ${countWhereClause}
+      SELECT COUNT(*) as total 
+      FROM orders o
+      LEFT JOIN profiles p ON o.user_id = p.user_id
+      ${countWhereClause}
     `);
         const total = countResult.recordset[0].total;
         return {
@@ -215,6 +301,8 @@ class OrdersService {
             conditions.push("o.branch_id = @branchId");
             request.input("branchId", filters.branch_id);
         }
+        // استثناء الطلبات pending_payment من الإحصائيات
+        conditions.push("o.status != 'pending_payment'");
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
         const result = await request.query(`
       SELECT 
@@ -232,6 +320,23 @@ class OrdersService {
       ${whereClause}
     `);
         return result.recordset[0];
+    }
+    // Delete order (admin only)
+    static async deleteOrder(orderId) {
+        // Check if order exists
+        const checkResult = await database_1.pool
+            .request()
+            .input("orderId", orderId)
+            .query("SELECT id FROM orders WHERE id = @orderId");
+        if (checkResult.recordset.length === 0) {
+            throw new error_middleware_1.ApiError(404, "Order not found");
+        }
+        // Delete the order
+        await database_1.pool
+            .request()
+            .input("orderId", orderId)
+            .query("DELETE FROM orders WHERE id = @orderId");
+        return { success: true, message: "Order deleted successfully" };
     }
 }
 exports.OrdersService = OrdersService;

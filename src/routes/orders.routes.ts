@@ -52,12 +52,24 @@ router.put(
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.cancelOrder
 );
+router.put(
+  "/:id/mark-paid",
+  authMiddleware,
+  validateParams(z.object({ id: z.string().uuid() })),
+  OrdersController.markOrderAsPaid
+);
 router.get(
   "/admin/all",
   authMiddleware,
   adminMiddleware,
   validateQuery(getOrdersQuerySchema),
   OrdersController.getAllOrders
+);
+router.get(
+  "/admin/debug",
+  authMiddleware,
+  adminMiddleware,
+  OrdersController.debugOrdersByStatus
 );
 router.get(
   "/admin/:id",
@@ -73,6 +85,15 @@ router.put(
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(updateOrderStatusSchema),
   OrdersController.updateOrderStatus
+);
+
+// Delete order (admin only)
+router.delete(
+  "/:id",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ id: z.string().uuid() })),
+  OrdersController.deleteOrder
 );
 
 export default router;

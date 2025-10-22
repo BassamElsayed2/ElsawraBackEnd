@@ -5,6 +5,7 @@ Backend API for Food CMS built with Express.js, TypeScript, SQL Server, and Bett
 ## 🚀 Features
 
 - **Authentication & Authorization**: Better Auth with JWT tokens stored in httpOnly cookies
+- **Google OAuth**: Sign in with Google support
 - **Database**: SQL Server with connection pooling
 - **Security**: Helmet, CORS, Rate Limiting, Input Validation
 - **Logging**: Winston logger with file rotation
@@ -111,6 +112,7 @@ See `.env.example` for all required environment variables.
 
 - `POST /api/auth/signup` - Register new user
 - `POST /api/auth/signin` - Login
+- `POST /api/auth/google` - Sign in with Google (requires idToken)
 - `POST /api/auth/signout` - Logout
 - `GET /api/auth/me` - Get current user
 - `POST /api/auth/forgot-password` - Request password reset

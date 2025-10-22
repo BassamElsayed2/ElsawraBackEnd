@@ -29,6 +29,12 @@ router.post(
   validateBody(signInSchema),
   AuthController.signIn
 );
+router.post(
+  "/google",
+  authLimiter,
+  validateBody(z.object({ idToken: z.string().min(1) })),
+  AuthController.googleSignIn
+);
 
 // Check if phone exists (public)
 router.post(

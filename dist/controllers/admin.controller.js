@@ -153,4 +153,27 @@ AdminController.getAllAdmins = (0, error_middleware_1.asyncHandler)(async (req, 
         },
     });
 });
+// Get all regular users (admin only)
+AdminController.getAllUsers = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const result = await database_1.pool.request().query(`
+        SELECT 
+          p.id, p.user_id, p.full_name, p.phone, p.phone_verified,
+          p.created_at as joined_at, p.updated_at,
+          u.email, u.email_verified,
+          COUNT(CASE WHEN o.status NOT IN ('cancelled', 'pending_payment') THEN 1 END) as orders_count
+        FROM profiles p
+        LEFT JOIN users u ON p.user_id = u.id
+        LEFT JOIN orders o ON p.user_id = o.user_id
+        WHERE p.user_id NOT IN (SELECT user_id FROM admin_profiles)
+        GROUP BY p.id, p.user_id, p.full_name, p.phone, p.phone_verified,
+                 p.created_at, p.updated_at, u.email, u.email_verified
+        ORDER BY p.created_at DESC
+      `);
+    res.json({
+        success: true,
+        data: {
+            users: result.recordset,
+        },
+    });
+});
 //# sourceMappingURL=admin.controller.js.map

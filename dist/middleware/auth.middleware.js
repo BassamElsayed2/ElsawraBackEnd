@@ -12,8 +12,10 @@ const error_middleware_1 = require("./error.middleware");
 // Verify JWT token from cookie
 async function authMiddleware(req, res, next) {
     try {
-        // Get token from cookies
-        const token = req.cookies["food_cms_session"] || req.cookies["food_cms.session.token"];
+        // Get token from cookies - support both app and dashboard cookies
+        const token = req.cookies["dashboard_session"] ||
+            req.cookies["food_cms_session"] ||
+            req.cookies["food_cms.session.token"];
         if (!token) {
             throw new error_middleware_1.ApiError(401, "Authentication required");
         }
@@ -79,7 +81,9 @@ async function adminMiddleware(req, res, next) {
 // Optional auth - doesn't throw error if no token
 async function optionalAuthMiddleware(req, res, next) {
     try {
-        const token = req.cookies["food_cms_session"] || req.cookies["food_cms.session.token"];
+        const token = req.cookies["dashboard_session"] ||
+            req.cookies["food_cms_session"] ||
+            req.cookies["food_cms.session.token"];
         if (!token) {
             return next();
         }

@@ -73,8 +73,8 @@ export const qrcodeController = {
       }
 
       // Generate survey URL
-      const frontendUrl = process.env.FRONTEND_URL;
-      const surveyUrl = `${frontendUrl}/feedback-survey/${branchId}`;
+      const DashboardUrl = process.env.DASHBOARD_URL;
+      const surveyUrl = `${DashboardUrl}/feedback-survey/${branchId}`;
 
       // Ensure QR codes directory exists
       const qrCodesDir = path.join(process.cwd(), "uploads", "qrcodes");

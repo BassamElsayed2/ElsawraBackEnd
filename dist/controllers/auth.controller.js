@@ -20,8 +20,12 @@ AuthController.signUp = (0, error_middleware_1.asyncHandler)(async (req, res, ne
 // Sign in
 AuthController.signIn = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
     const result = await auth_service_1.AuthService.signIn(req.body, req);
+    // Determine cookie name based on user role
+    // Admins use dashboard_session, regular users use food_cms_session
+    const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
+    const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
     // Set httpOnly cookie
-    res.cookie("food_cms_session", result.token, {
+    res.cookie(cookieName, result.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
@@ -37,12 +41,13 @@ AuthController.signIn = (0, error_middleware_1.asyncHandler)(async (req, res, ne
 });
 // Sign out
 AuthController.signOut = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const token = req.cookies["food_cms_session"];
+    const token = req.cookies["dashboard_session"] || req.cookies["food_cms_session"];
     if (req.user && token) {
         await auth_service_1.AuthService.signOut(req.user.id, token, req);
     }
-    // Clear cookie
+    // Clear both cookies (in case both exist)
     res.clearCookie("food_cms_session");
+    res.clearCookie("dashboard_session");
     res.json({
         success: true,
         message: "Logged out successfully",
@@ -100,6 +105,37 @@ AuthController.checkPhoneExists = (0, error_middleware_1.asyncHandler)(async (re
     res.json({
         success: true,
         data: { exists },
+    });
+});
+// Google Sign In
+AuthController.googleSignIn = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const { idToken } = req.body;
+    if (!idToken) {
+        return res.status(400).json({
+            success: false,
+            message: "Google ID token is required",
+        });
+    }
+    const result = await auth_service_1.AuthService.googleSignIn(idToken, req);
+    // Determine cookie name based on user role
+    const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
+    const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
+    // Set httpOnly cookie
+    res.cookie(cookieName, result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+    res.json({
+        success: true,
+        message: result.isNewUser
+            ? "Account created successfully with Google"
+            : "Logged in successfully with Google",
+        data: {
+            user: result.user,
+            isNewUser: result.isNewUser,
+        },
     });
 });
 //# sourceMappingURL=auth.controller.js.map

@@ -7,5 +7,6 @@ export declare class AuthController {
     static updateProfile: (req: import("express").Request, res: Response, next: NextFunction) => void;
     static changePassword: (req: import("express").Request, res: Response, next: NextFunction) => void;
     static checkPhoneExists: (req: import("express").Request, res: Response, next: NextFunction) => void;
+    static googleSignIn: (req: import("express").Request, res: Response, next: NextFunction) => void;
 }
 //# sourceMappingURL=auth.controller.d.ts.map

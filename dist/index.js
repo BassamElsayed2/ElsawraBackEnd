@@ -15,7 +15,6 @@ const database_1 = require("./config/database");
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT;
-app.set("trust proxy", 1);
 // Security middleware
 app.use((0, helmet_1.default)());
 // CORS configuration
@@ -70,6 +69,7 @@ const qrcode_routes_1 = __importDefault(require("./routes/qrcode.routes"));
 const feedback_routes_1 = __importDefault(require("./routes/feedback.routes"));
 const addresses_routes_1 = __importDefault(require("./routes/addresses.routes"));
 const delivery_routes_1 = __importDefault(require("./routes/delivery.routes"));
+const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
 // Serve uploaded files with CORS
 app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -92,6 +92,7 @@ app.use("/api/qrcode", qrcode_routes_1.default);
 app.use("/api/feedback", feedback_routes_1.default);
 app.use("/api/addresses", addresses_routes_1.default);
 app.use("/api/delivery", delivery_routes_1.default);
+app.use("/api/payments", payment_routes_1.default);
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({

@@ -44,25 +44,70 @@ class ProductsService {
         FETCH NEXT @limit ROWS ONLY
       `);
         const products = productsResult.recordset;
-        // Get types and sizes for each product
-        for (const product of products) {
-            const typesResult = await database_1.pool.request().input("productId", product.id)
-                .query(`
-          SELECT id, name_ar, name_en, created_at
-          FROM product_types
-          WHERE product_id = @productId
-        `);
+        // Optimize: Get all types and sizes in bulk instead of N+1 queries
+        if (products.length > 0) {
+            const productIds = products.map((p) => p.id);
+            // Get all types for these products in one query using TVP or temp table
+            const typesRequest = database_1.pool.request();
+            // Create a parameterized query with multiple OR conditions
+            const typeWhereConditions = productIds
+                .map((_, index) => `product_id = @productId${index}`)
+                .join(" OR ");
+            productIds.forEach((id, index) => {
+                typesRequest.input(`productId${index}`, id);
+            });
+            const typesResult = await typesRequest.query(`
+        SELECT id, product_id, name_ar, name_en, created_at
+        FROM product_types
+        WHERE ${typeWhereConditions}
+        ORDER BY created_at
+      `);
             const types = typesResult.recordset;
-            for (const type of types) {
-                const sizesResult = await database_1.pool.request().input("typeId", type.id)
-                    .query(`
-            SELECT id, size_ar, size_en, price, offer_price, created_at
-            FROM product_sizes
-            WHERE type_id = @typeId
-          `);
-                type.sizes = sizesResult.recordset;
+            // Get all sizes for these types in one query
+            if (types.length > 0) {
+                const typeIds = types.map((t) => t.id);
+                const sizesRequest = database_1.pool.request();
+                const sizeWhereConditions = typeIds
+                    .map((_, index) => `type_id = @typeId${index}`)
+                    .join(" OR ");
+                typeIds.forEach((id, index) => {
+                    sizesRequest.input(`typeId${index}`, id);
+                });
+                const sizesResult = await sizesRequest.query(`
+          SELECT id, type_id, size_ar, size_en, price, offer_price, created_at
+          FROM product_sizes
+          WHERE ${sizeWhereConditions}
+          ORDER BY price
+        `);
+                const sizes = sizesResult.recordset;
+                // Map sizes to types
+                const sizesMap = new Map();
+                sizes.forEach((size) => {
+                    if (!sizesMap.has(size.type_id)) {
+                        sizesMap.set(size.type_id, []);
+                    }
+                    sizesMap.get(size.type_id).push(size);
+                });
+                types.forEach((type) => {
+                    type.sizes = sizesMap.get(type.id) || [];
+                });
             }
-            product.types = types;
+            else {
+                types.forEach((type) => {
+                    type.sizes = [];
+                });
+            }
+            // Map types to products
+            const typesMap = new Map();
+            types.forEach((type) => {
+                if (!typesMap.has(type.product_id)) {
+                    typesMap.set(type.product_id, []);
+                }
+                typesMap.get(type.product_id).push(type);
+            });
+            products.forEach((product) => {
+                product.types = typesMap.get(product.id) || [];
+            });
         }
         // Get total count
         const countRequest = database_1.pool.request();

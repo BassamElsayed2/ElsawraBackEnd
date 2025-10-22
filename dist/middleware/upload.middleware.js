@@ -5,27 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadMultiple = exports.uploadSingle = exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
-const path_1 = __importDefault(require("path"));
-const fs_1 = __importDefault(require("fs"));
-// Ensure uploads directory exists
-const uploadsDir = path_1.default.join(process.cwd(), "uploads");
-if (!fs_1.default.existsSync(uploadsDir)) {
-    fs_1.default.mkdirSync(uploadsDir, { recursive: true });
-}
-// Configure storage
-const storage = multer_1.default.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-        // Generate unique filename: timestamp-random-originalname
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const ext = path_1.default.extname(file.originalname);
-        const nameWithoutExt = path_1.default.basename(file.originalname, ext);
-        const filename = `${nameWithoutExt}-${uniqueSuffix}${ext}`;
-        cb(null, filename);
-    },
-});
+// Configure memory storage for Supabase uploads
+const storage = multer_1.default.memoryStorage();
 // File filter - only allow images
 const fileFilter = (req, file, cb) => {
     const allowedMimes = [

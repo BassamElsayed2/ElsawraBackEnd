@@ -241,7 +241,24 @@ BEGIN
         -- Generate new order ID
         SET @order_id = NEWID();
         
-        -- Insert order
+        -- Determine initial order status based on payment method
+        DECLARE @initial_status NVARCHAR(20);
+        DECLARE @initial_payment_status NVARCHAR(20);
+        
+        -- If payment method is online payment (easykash, card, etc.), set status to pending_payment
+        -- Otherwise (cash, COD), set status to pending
+        IF @payment_method IN ('easykash', 'card', 'online', 'wallet')
+        BEGIN
+            SET @initial_status = 'pending_payment';
+            SET @initial_payment_status = 'pending';
+        END
+        ELSE
+        BEGIN
+            SET @initial_status = 'pending';
+            SET @initial_payment_status = 'not_required';
+        END
+        
+        -- Insert order  
         INSERT INTO orders (
             id, user_id, address_id, delivery_type, branch_id,
             status, items, subtotal, delivery_fee, total,
@@ -249,8 +266,8 @@ BEGIN
         )
         VALUES (
             @order_id, @user_id, @address_id, @delivery_type, @branch_id,
-            'pending', @items, @subtotal, @delivery_fee, @total,
-            @notes, @payment_method, 'pending'
+            @initial_status, @items, @subtotal, @delivery_fee, @total,
+            @notes, @payment_method, @initial_payment_status
         );
         
         COMMIT TRANSACTION;

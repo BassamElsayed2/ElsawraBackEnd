@@ -44,6 +44,19 @@ export declare class AuthService {
         success: boolean;
     }>;
     static checkPhoneExists(phone: string): Promise<boolean>;
+    static googleSignIn(idToken: string, req: Request): Promise<{
+        user: {
+            id: any;
+            email: any;
+            full_name: any;
+            phone: any;
+            email_verified: any;
+            phone_verified: any;
+            role: any;
+        };
+        token: string;
+        isNewUser: boolean;
+    }>;
 }
 export {};
 //# sourceMappingURL=auth.service.d.ts.map

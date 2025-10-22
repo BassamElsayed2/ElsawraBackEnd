@@ -14,18 +14,9 @@ router.post(
   uploadController.uploadImage
 );
 
-// Upload branch image (admin only)
-router.post(
-  "/branch-image",
-  authMiddleware,
-  adminMiddleware,
-  uploadSingle("image"),
-  uploadController.uploadBranchImage
-);
-
 // Delete image (admin only)
 router.delete(
-  "/image/:filename",
+  "/image",
   authMiddleware,
   adminMiddleware,
   uploadController.deleteImage

@@ -15,8 +15,12 @@ router.get("/", auth_middleware_1.authMiddleware, (0, validation_middleware_1.va
 router.get("/:id", auth_middleware_1.authMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), orders_controller_1.OrdersController.getOrderById);
 router.post("/", auth_middleware_1.authMiddleware, rate_limit_middleware_1.ordersLimiter, (0, validation_middleware_1.validateBody)(orders_validators_1.createOrderSchema), orders_controller_1.OrdersController.createOrder);
 router.put("/:id/cancel", auth_middleware_1.authMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), orders_controller_1.OrdersController.cancelOrder);
+router.put("/:id/mark-paid", auth_middleware_1.authMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), orders_controller_1.OrdersController.markOrderAsPaid);
 router.get("/admin/all", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateQuery)(orders_validators_1.getOrdersQuerySchema), orders_controller_1.OrdersController.getAllOrders);
+router.get("/admin/debug", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, orders_controller_1.OrdersController.debugOrdersByStatus);
 router.get("/admin/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), orders_controller_1.OrdersController.getOrderByIdAdmin);
 router.put("/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(orders_validators_1.updateOrderStatusSchema), orders_controller_1.OrdersController.updateOrderStatus);
+// Delete order (admin only)
+router.delete("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), orders_controller_1.OrdersController.deleteOrder);
 exports.default = router;
 //# sourceMappingURL=orders.routes.js.map

@@ -12,7 +12,7 @@ dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT;
-app.set("trust proxy", 1);
+
 // Security middleware
 app.use(helmet());
 
@@ -68,12 +68,13 @@ import offersRoutes from "./routes/offers.routes";
 import comboOffersRoutes from "./routes/comboOffers.routes";
 import adminRoutes from "./routes/admin.routes";
 import uploadRoutes from "./routes/upload.routes";
-import tempAdminRoutes from "./routes/temp-admin.routes";
+
 import branchesRoutes from "./routes/branches.routes";
 import qrcodeRoutes from "./routes/qrcode.routes";
 import feedbackRoutes from "./routes/feedback.routes";
 import addressesRoutes from "./routes/addresses.routes";
 import deliveryRoutes from "./routes/delivery.routes";
+import paymentRoutes from "./routes/payment.routes";
 
 // Serve uploaded files with CORS
 app.use(
@@ -102,6 +103,7 @@ app.use("/api/qrcode", qrcodeRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/addresses", addressesRoutes);
 app.use("/api/delivery", deliveryRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {

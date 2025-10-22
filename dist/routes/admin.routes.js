@@ -13,5 +13,7 @@ router.get("/profile", admin_controller_1.AdminController.getAdminProfile);
 router.put("/profile", admin_controller_1.AdminController.updateAdminProfile);
 // Get all admins (super_admin only)
 router.get("/all", admin_controller_1.AdminController.getAllAdmins);
+// Get all regular users (admin only)
+router.get("/users", admin_controller_1.AdminController.getAllUsers);
 exports.default = router;
 //# sourceMappingURL=admin.routes.js.map

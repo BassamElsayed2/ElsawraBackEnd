@@ -83,6 +83,7 @@ export interface Order {
   branch_id?: string;
   status:
     | "pending"
+    | "pending_payment"
     | "confirmed"
     | "preparing"
     | "ready"

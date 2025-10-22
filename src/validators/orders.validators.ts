@@ -25,12 +25,13 @@ export const createOrderSchema = z.object({
   delivery_fee: z.number().min(0),
   total: z.number().positive(),
   notes: z.string().max(500).optional(),
-  payment_method: z.enum(["cash", "card", "wallet"]).optional(),
+  payment_method: z.enum(["cash", "card", "wallet", "easykash"]).optional(),
 });
 
 export const updateOrderStatusSchema = z.object({
   status: z.enum([
     "pending",
+    "pending_payment",
     "confirmed",
     "preparing",
     "ready",
@@ -46,6 +47,7 @@ export const getOrdersQuerySchema = z.object({
   status: z
     .enum([
       "pending",
+      "pending_payment",
       "confirmed",
       "preparing",
       "ready",

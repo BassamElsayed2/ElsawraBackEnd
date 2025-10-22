@@ -69,16 +69,6 @@ async function createAdminUser(data: AdminData) {
         `);
 
       await transaction.commit();
-
-      console.log("✅ تم إنشاء مستخدم Admin بنجاح!\n");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("📧 Email:", data.email);
-      console.log("🔑 Password:", data.password);
-      console.log("👤 Name:", data.full_name);
-      console.log("📱 Phone:", data.phone);
-      console.log("👑 Role:", data.role || "admin");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-      console.log("⚠️  يرجى تغيير كلمة المرور بعد تسجيل الدخول!\n");
     } catch (error) {
       await transaction.rollback();
       throw error;

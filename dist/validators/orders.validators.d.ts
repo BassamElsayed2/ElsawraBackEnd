@@ -47,7 +47,7 @@ export declare const createOrderSchema: z.ZodObject<{
     delivery_fee: z.ZodNumber;
     total: z.ZodNumber;
     notes: z.ZodOptional<z.ZodString>;
-    payment_method: z.ZodOptional<z.ZodEnum<["cash", "card", "wallet"]>>;
+    payment_method: z.ZodOptional<z.ZodEnum<["cash", "card", "wallet", "easykash"]>>;
 }, "strip", z.ZodTypeAny, {
     items?: {
         type?: "product" | "offer";
@@ -70,7 +70,7 @@ export declare const createOrderSchema: z.ZodObject<{
     delivery_fee?: number;
     total?: number;
     notes?: string;
-    payment_method?: "cash" | "card" | "wallet";
+    payment_method?: "cash" | "card" | "wallet" | "easykash";
 }, {
     items?: {
         type?: "product" | "offer";
@@ -93,28 +93,28 @@ export declare const createOrderSchema: z.ZodObject<{
     delivery_fee?: number;
     total?: number;
     notes?: string;
-    payment_method?: "cash" | "card" | "wallet";
+    payment_method?: "cash" | "card" | "wallet" | "easykash";
 }>;
 export declare const updateOrderStatusSchema: z.ZodObject<{
-    status: z.ZodEnum<["pending", "confirmed", "preparing", "ready", "delivering", "delivered", "cancelled"]>;
+    status: z.ZodEnum<["pending", "pending_payment", "confirmed", "preparing", "ready", "delivering", "delivered", "cancelled"]>;
 }, "strip", z.ZodTypeAny, {
-    status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status?: "pending" | "pending_payment" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
 }, {
-    status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status?: "pending" | "pending_payment" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
 }>;
 export declare const getOrdersQuerySchema: z.ZodObject<{
     page: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
     limit: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
-    status: z.ZodOptional<z.ZodEnum<["pending", "confirmed", "preparing", "ready", "delivering", "delivered", "cancelled"]>>;
+    status: z.ZodOptional<z.ZodEnum<["pending", "pending_payment", "confirmed", "preparing", "ready", "delivering", "delivered", "cancelled"]>>;
     order_id: z.ZodOptional<z.ZodString>;
 }, "strip", z.ZodTypeAny, {
     limit?: number;
-    status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status?: "pending" | "pending_payment" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     page?: number;
     order_id?: string;
 }, {
     limit?: string;
-    status?: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status?: "pending" | "pending_payment" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     page?: string;
     order_id?: string;
 }>;

@@ -17,9 +17,11 @@ export async function authMiddleware(
   next: NextFunction
 ) {
   try {
-    // Get token from cookies
+    // Get token from cookies - support both app and dashboard cookies
     const token =
-      req.cookies["food_cms_session"] || req.cookies["food_cms.session.token"];
+      req.cookies["dashboard_session"] ||
+      req.cookies["food_cms_session"] ||
+      req.cookies["food_cms.session.token"];
 
     if (!token) {
       throw new ApiError(401, "Authentication required");
@@ -105,7 +107,9 @@ export async function optionalAuthMiddleware(
 ) {
   try {
     const token =
-      req.cookies["food_cms_session"] || req.cookies["food_cms.session.token"];
+      req.cookies["dashboard_session"] ||
+      req.cookies["food_cms_session"] ||
+      req.cookies["food_cms.session.token"];
 
     if (!token) {
       return next();

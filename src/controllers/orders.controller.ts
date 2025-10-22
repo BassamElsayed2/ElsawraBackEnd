@@ -51,6 +51,18 @@ export class OrdersController {
           .json({ success: false, message: "Not authenticated" });
       }
 
+      // Check if user has phone number (required for orders)
+      const userProfile = await OrdersService.getUserProfile(req.user.id);
+
+      if (!userProfile.phone) {
+        return res.status(400).json({
+          success: false,
+          message: "Phone number is required to place an order",
+          error: "PHONE_REQUIRED",
+          messageAr: "رقم الهاتف مطلوب لإتمام الطلب",
+        });
+      }
+
       const order = await OrdersService.createOrder(req.user.id, req.body);
 
       res.status(201).json({
@@ -97,34 +109,98 @@ export class OrdersController {
     }
   );
 
+  // Mark order as paid (user)
+  static markOrderAsPaid = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      if (!req.user) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Not authenticated" });
+      }
+
+      const { id } = req.params;
+      const order = await OrdersService.markOrderAsPaid(id, req.user.id);
+
+      res.json({
+        success: true,
+        message: "Order marked as paid successfully",
+        data: { order },
+      });
+    }
+  );
+
   // Get all orders (admin)
   static getAllOrders = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {
-      const { page, limit, status, order_id } = req.query as any;
-
-      console.log("📋 Orders Query Parameters:", {
-        page,
-        limit,
-        status,
-        order_id,
-      });
+      const { page, limit, status, order_id, customer_name } = req.query as any;
 
       const result = await OrdersService.getAllOrders(
         parseInt(page) || 1,
         parseInt(limit) || 10,
         status,
-        order_id
+        order_id,
+        customer_name
       );
 
       console.log("📦 Orders Result:", {
         totalOrders: result.orders.length,
         total: result.total,
         searchedOrderId: order_id,
+        searchedCustomerName: customer_name,
+        status: status || "all",
       });
 
       res.json({
         success: true,
         data: result,
+      });
+    }
+  );
+
+  // Debug orders by status
+  static debugOrdersByStatus = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { status } = req.query as any;
+
+      console.log("🔍 Debug Orders by Status:", status);
+
+      const result = await OrdersService.getAllOrders(
+        1,
+        100, // Get more orders for debugging
+        status,
+        undefined
+      );
+
+      console.log("🔍 Debug Result:", {
+        status: status || "all",
+        totalOrders: result.orders.length,
+        total: result.total,
+        orders: result.orders.map((o) => ({
+          id: o.id,
+          status: o.status,
+          payment_status: o.payment_status,
+          payment_method: o.payment_method,
+          total: o.total,
+          created_at: o.created_at,
+        })),
+      });
+
+      res.json({
+        success: true,
+        message: `Debug orders for status: ${status || "all"}`,
+        data: {
+          status: status || "all",
+          totalOrders: result.orders.length,
+          total: result.total,
+          orders: result.orders.map((o) => ({
+            id: o.id,
+            status: o.status,
+            payment_status: o.payment_status,
+            payment_method: o.payment_method,
+            total: o.total,
+            created_at: o.created_at,
+          })),
+        },
       });
     }
   );
@@ -158,6 +234,20 @@ export class OrdersController {
       res.json({
         success: true,
         data: { stats },
+      });
+    }
+  );
+
+  // Delete order (admin only)
+  static deleteOrder = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { id } = req.params;
+
+      const result = await OrdersService.deleteOrder(id);
+
+      res.json({
+        success: true,
+        data: result,
       });
     }
   );

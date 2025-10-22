@@ -1,12 +1,8 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadController = void 0;
 const logger_1 = require("../utils/logger");
-const path_1 = __importDefault(require("path"));
-const promises_1 = __importDefault(require("fs/promises"));
+const supabase_upload_service_1 = require("../services/supabase-upload.service");
 exports.uploadController = {
     // Generic image upload
     uploadImage: async (req, res, next) => {
@@ -18,25 +14,38 @@ exports.uploadController = {
                 });
                 return;
             }
-            // Get file info
-            const file = req.file;
-            // Build full URL for the image using API_URL from environment
-            const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
-            const imageUrl = `${apiUrl}/uploads/${file.filename}`;
-            logger_1.logger.info(`Image uploaded: ${file.filename}`);
+            // Get bucket and folder from request body
+            const bucket = req.body.bucket || supabase_upload_service_1.BUCKETS.PRODUCT_IMAGES;
+            const folder = req.body.folder;
+            // Validate bucket
+            const validBuckets = Object.values(supabase_upload_service_1.BUCKETS);
+            if (!validBuckets.includes(bucket)) {
+                res.status(400).json({
+                    success: false,
+                    message: `Invalid bucket. Must be one of: ${validBuckets.join(", ")}`,
+                });
+                return;
+            }
+            // Ensure bucket exists
+            await supabase_upload_service_1.SupabaseUploadService.createBucket(bucket);
+            // Upload to Supabase
+            const { url, path } = await supabase_upload_service_1.SupabaseUploadService.uploadFile(req.file, bucket, folder);
+            logger_1.logger.info(`Image uploaded to Supabase: ${path} in bucket: ${bucket}`);
             res.status(200).json({
                 success: true,
                 message: "Image uploaded successfully",
                 data: {
-                    url: imageUrl,
-                    imageUrl: imageUrl,
+                    url: url,
+                    imageUrl: url,
+                    path: path,
+                    bucket: bucket,
                 },
-                imageUrl,
+                imageUrl: url,
                 file: {
-                    filename: file.filename,
-                    originalName: file.originalname,
-                    size: file.size,
-                    mimetype: file.mimetype,
+                    filename: req.file.filename,
+                    originalName: req.file.originalname,
+                    size: req.file.size,
+                    mimetype: req.file.mimetype,
                 },
             });
         }
@@ -81,34 +90,30 @@ exports.uploadController = {
     // Delete uploaded image
     deleteImage: async (req, res, next) => {
         try {
-            const { filename } = req.params;
-            if (!filename) {
+            const { bucket, path } = req.body;
+            if (!bucket || !path) {
                 res.status(400).json({
                     success: false,
-                    message: "Filename is required",
+                    message: "Bucket and path are required",
                 });
                 return;
             }
-            const filePath = path_1.default.join(process.cwd(), "uploads", filename);
-            try {
-                await promises_1.default.unlink(filePath);
-                logger_1.logger.info(`Image deleted: ${filename}`);
-                res.status(200).json({
-                    success: true,
-                    message: "Image deleted successfully",
+            // Validate bucket
+            const validBuckets = Object.values(supabase_upload_service_1.BUCKETS);
+            if (!validBuckets.includes(bucket)) {
+                res.status(400).json({
+                    success: false,
+                    message: `Invalid bucket. Must be one of: ${validBuckets.join(", ")}`,
                 });
+                return;
             }
-            catch (err) {
-                if (err.code === "ENOENT") {
-                    res.status(404).json({
-                        success: false,
-                        message: "Image not found",
-                    });
-                }
-                else {
-                    throw err;
-                }
-            }
+            // Delete from Supabase
+            await supabase_upload_service_1.SupabaseUploadService.deleteFile(bucket, path);
+            logger_1.logger.info(`Image deleted from Supabase: ${path} in bucket: ${bucket}`);
+            res.status(200).json({
+                success: true,
+                message: "Image deleted successfully",
+            });
         }
         catch (error) {
             logger_1.logger.error("Error deleting image:", error);

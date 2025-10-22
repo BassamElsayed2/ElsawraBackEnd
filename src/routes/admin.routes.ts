@@ -17,4 +17,7 @@ router.put("/profile", AdminController.updateAdminProfile);
 // Get all admins (super_admin only)
 router.get("/all", AdminController.getAllAdmins);
 
+// Get all regular users (admin only)
+router.get("/users", AdminController.getAllUsers);
+
 export default router;

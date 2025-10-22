@@ -71,7 +71,7 @@ export interface Order {
     address_id: string;
     delivery_type: "delivery" | "pickup";
     branch_id?: string;
-    status: "pending" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
+    status: "pending" | "pending_payment" | "confirmed" | "preparing" | "ready" | "delivering" | "delivered" | "cancelled";
     items: string;
     subtotal: number;
     delivery_fee: number;

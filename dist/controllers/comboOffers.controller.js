@@ -14,7 +14,8 @@ ComboOffersController.getAllComboOffers = (0, error_middleware_1.asyncHandler)(a
     let query = `
         SELECT 
           id, title_ar, title_en, description_ar, description_en,
-          image_url, price, original_price, is_active,
+          image_url, price, original_price, 
+          NULL as starts_at, NULL as ends_at, is_active,
           created_at, updated_at
         FROM combo_offers
         WHERE 1=1
@@ -23,6 +24,10 @@ ComboOffersController.getAllComboOffers = (0, error_middleware_1.asyncHandler)(a
     if (is_active !== undefined) {
         query += " AND is_active = @is_active";
         request.input("is_active", is_active === "true" || is_active === "1");
+    }
+    else {
+        // Default to active offers only for public API
+        query += " AND is_active = 1";
     }
     if (search) {
         query += " AND (title_ar LIKE @search OR title_en LIKE @search)";

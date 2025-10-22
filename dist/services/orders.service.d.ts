@@ -10,6 +10,7 @@ export interface CreateOrderData {
     payment_method?: string;
 }
 export declare class OrdersService {
+    static getUserProfile(userId: string): Promise<any>;
     static getUserOrders(userId: string, page?: number, limit?: number): Promise<{
         orders: any[];
         total: any;
@@ -20,8 +21,9 @@ export declare class OrdersService {
     static getOrderById(orderId: string, userId?: string): Promise<any>;
     static createOrder(userId: string, data: CreateOrderData): Promise<any>;
     static updateOrderStatus(orderId: string, status: string): Promise<any>;
+    static markOrderAsPaid(orderId: string, userId: string): Promise<any>;
     static cancelOrder(orderId: string, userId: string): Promise<any>;
-    static getAllOrders(page?: number, limit?: number, status?: string, orderId?: string): Promise<{
+    static getAllOrders(page?: number, limit?: number, status?: string, orderId?: string, customerName?: string): Promise<{
         orders: any[];
         total: any;
         page: number;
@@ -33,5 +35,9 @@ export declare class OrdersService {
         end_date?: string;
         branch_id?: string;
     }): Promise<any>;
+    static deleteOrder(orderId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
 }
 //# sourceMappingURL=orders.service.d.ts.map

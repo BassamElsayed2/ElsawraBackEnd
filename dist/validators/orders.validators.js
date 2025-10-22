@@ -26,11 +26,12 @@ exports.createOrderSchema = zod_1.z.object({
     delivery_fee: zod_1.z.number().min(0),
     total: zod_1.z.number().positive(),
     notes: zod_1.z.string().max(500).optional(),
-    payment_method: zod_1.z.enum(["cash", "card", "wallet"]).optional(),
+    payment_method: zod_1.z.enum(["cash", "card", "wallet", "easykash"]).optional(),
 });
 exports.updateOrderStatusSchema = zod_1.z.object({
     status: zod_1.z.enum([
         "pending",
+        "pending_payment",
         "confirmed",
         "preparing",
         "ready",
@@ -45,6 +46,7 @@ exports.getOrdersQuerySchema = zod_1.z.object({
     status: zod_1.z
         .enum([
         "pending",
+        "pending_payment",
         "confirmed",
         "preparing",
         "ready",
