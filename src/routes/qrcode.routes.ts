@@ -4,6 +4,14 @@ import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
+// Get all QR Codes (admin only) - Must be before /:branchId route
+router.get(
+  "/all",
+  authMiddleware,
+  adminMiddleware,
+  qrcodeController.getAllQRCodes
+);
+
 // Generate QR Code for a branch (admin only)
 router.post(
   "/generate/:branchId",
@@ -14,14 +22,6 @@ router.post(
 
 // Get QR Code for a branch (public or authenticated)
 router.get("/:branchId", qrcodeController.getQRCode);
-
-// Get all QR Codes (admin only)
-router.get(
-  "/",
-  authMiddleware,
-  adminMiddleware,
-  qrcodeController.getAllQRCodes
-);
 
 // Delete QR Code (admin only)
 router.delete(
