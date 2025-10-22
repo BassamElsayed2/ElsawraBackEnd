@@ -3,6 +3,7 @@ export declare const BUCKETS: {
     readonly COMBO_OFFERS_MEDIA: "combooffersmedia";
     readonly AVATARS: "avatars";
     readonly BRANCHES: "branches";
+    readonly QR_IMAGES: "QrImages";
 };
 export type BucketName = keyof typeof BUCKETS;
 export declare class SupabaseUploadService {
@@ -10,6 +11,13 @@ export declare class SupabaseUploadService {
      * Upload file to Supabase Storage
      */
     static uploadFile(file: Express.Multer.File, bucket: string, folder?: string): Promise<{
+        url: string;
+        path: string;
+    }>;
+    /**
+     * Upload buffer to Supabase Storage (useful for generated images like QR codes)
+     */
+    static uploadBuffer(buffer: Buffer, filename: string, bucket: string, folder?: string, contentType?: string): Promise<{
         url: string;
         path: string;
     }>;

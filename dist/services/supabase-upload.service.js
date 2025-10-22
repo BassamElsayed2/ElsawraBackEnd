@@ -16,6 +16,7 @@ exports.BUCKETS = {
     COMBO_OFFERS_MEDIA: "combooffersmedia",
     AVATARS: "avatars",
     BRANCHES: "branches",
+    QR_IMAGES: "QrImages",
 };
 class SupabaseUploadService {
     /**
@@ -56,6 +57,42 @@ class SupabaseUploadService {
         }
         catch (error) {
             logger_1.logger.error("Error in SupabaseUploadService.uploadFile:", error);
+            throw error;
+        }
+    }
+    /**
+     * Upload buffer to Supabase Storage (useful for generated images like QR codes)
+     */
+    static async uploadBuffer(buffer, filename, bucket, folder, contentType = "image/png") {
+        try {
+            // Create file path
+            const filePath = folder ? `${folder}/${filename}` : filename;
+            // Upload buffer to Supabase
+            const { data, error } = await supabase.storage
+                .from(bucket)
+                .upload(filePath, buffer, {
+                contentType: contentType,
+                upsert: false, // Don't overwrite existing files
+            });
+            if (error) {
+                logger_1.logger.error("Supabase upload error:", error);
+                throw new Error(`Failed to upload buffer: ${error.message}`);
+            }
+            // Get public URL
+            const { data: urlData } = supabase.storage
+                .from(bucket)
+                .getPublicUrl(filePath);
+            if (!urlData.publicUrl) {
+                throw new Error("Failed to get public URL for uploaded file");
+            }
+            logger_1.logger.info(`Buffer uploaded successfully: ${filePath} to bucket: ${bucket}`);
+            return {
+                url: urlData.publicUrl,
+                path: filePath,
+            };
+        }
+        catch (error) {
+            logger_1.logger.error("Error in SupabaseUploadService.uploadBuffer:", error);
             throw error;
         }
     }
