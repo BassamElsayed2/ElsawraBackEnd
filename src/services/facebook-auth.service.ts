@@ -20,6 +20,24 @@ export interface FacebookUserInfo {
   };
 }
 
+interface FacebookAppTokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+interface FacebookDebugTokenResponse {
+  data: {
+    app_id: string;
+    type: string;
+    application: string;
+    data_access_expires_at: number;
+    expires_at: number;
+    is_valid: boolean;
+    scopes: string[];
+    user_id: string;
+  };
+}
+
 export class FacebookAuthService {
   /**
    * Verify Facebook access token and get user information
@@ -41,7 +59,8 @@ export class FacebookAuthService {
         throw new ApiError(401, "Failed to verify Facebook token");
       }
 
-      const appTokenData = await appTokenResponse.json();
+      const appTokenData =
+        (await appTokenResponse.json()) as FacebookAppTokenResponse;
       const appAccessToken = appTokenData.access_token;
 
       // Inspect the user access token to verify it's valid and belongs to our app
@@ -53,7 +72,8 @@ export class FacebookAuthService {
         throw new ApiError(401, "Invalid Facebook access token");
       }
 
-      const inspectData = await inspectResponse.json();
+      const inspectData =
+        (await inspectResponse.json()) as FacebookDebugTokenResponse;
 
       if (!inspectData.data || !inspectData.data.is_valid) {
         throw new ApiError(401, "Invalid Facebook access token");
@@ -75,7 +95,7 @@ export class FacebookAuthService {
         );
       }
 
-      const userData: FacebookUserInfo = await userResponse.json();
+      const userData = (await userResponse.json()) as FacebookUserInfo;
 
       // Verify email is present
       if (!userData.email) {
