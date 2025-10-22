@@ -57,6 +57,19 @@ export declare class AuthService {
         token: string;
         isNewUser: boolean;
     }>;
+    static facebookSignIn(accessToken: string, req: Request): Promise<{
+        user: {
+            id: any;
+            email: any;
+            full_name: any;
+            phone: any;
+            email_verified: any;
+            phone_verified: any;
+            role: any;
+        };
+        token: string;
+        isNewUser: boolean;
+    }>;
 }
 export {};
 //# sourceMappingURL=auth.service.d.ts.map
