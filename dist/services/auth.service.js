@@ -12,6 +12,7 @@ const error_middleware_1 = require("../middleware/error.middleware");
 const validation_1 = require("../utils/validation");
 const security_middleware_1 = require("../middleware/security.middleware");
 const google_auth_service_1 = require("./google-auth.service");
+const facebook_auth_service_1 = require("./facebook-auth.service");
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "12");
@@ -411,6 +412,117 @@ class AuthService {
         // Log success
         await (0, security_middleware_1.logSecurityEvent)("LOGIN_SUCCESS", req, user.id, googleUser.email, {
             method: "google",
+            isNewUser,
+        });
+        return {
+            user: {
+                id: user.id,
+                email: user.email,
+                full_name: user.full_name,
+                phone: user.phone,
+                email_verified: user.email_verified,
+                phone_verified: user.phone_verified,
+                role: userRole,
+            },
+            token,
+            isNewUser,
+        };
+    }
+    // Facebook Sign In
+    static async facebookSignIn(accessToken, req) {
+        // Verify Facebook token and get user info
+        const facebookUser = await facebook_auth_service_1.FacebookAuthService.verifyAccessToken(accessToken);
+        // Check if user exists
+        const userResult = await database_1.pool
+            .request()
+            .input("email", facebookUser.email.toLowerCase()).query(`
+        SELECT u.id, u.email, u.email_verified,
+               p.full_name, p.phone, p.phone_verified
+        FROM users u
+        LEFT JOIN profiles p ON u.id = p.user_id
+        WHERE u.email = @email
+      `);
+        let user;
+        let isNewUser = false;
+        if (userResult.recordset.length === 0) {
+            // Create new user from Facebook account
+            const transaction = database_1.pool.transaction();
+            await transaction.begin();
+            try {
+                // Create user without password (Facebook OAuth user)
+                const newUserResult = await transaction
+                    .request()
+                    .input("email", facebookUser.email.toLowerCase())
+                    .input("emailVerified", 1) // Facebook emails are pre-verified
+                    .query(`
+            INSERT INTO users (email, email_verified)
+            OUTPUT INSERTED.id, INSERTED.email, INSERTED.email_verified
+            VALUES (@email, @emailVerified)
+          `);
+                user = newUserResult.recordset[0];
+                // Create profile
+                await transaction
+                    .request()
+                    .input("userId", user.id)
+                    .input("fullName", facebookUser.name).query(`
+            INSERT INTO profiles (user_id, full_name, phone_verified)
+            VALUES (@userId, @fullName, 0)
+          `);
+                await transaction.commit();
+                user.full_name = facebookUser.name;
+                user.phone = null;
+                user.phone_verified = false;
+                isNewUser = true;
+                // Log signup
+                await (0, security_middleware_1.logSecurityEvent)("SIGNUP_SUCCESS", req, user.id, facebookUser.email, {
+                    method: "facebook",
+                });
+            }
+            catch (error) {
+                await transaction.rollback();
+                throw error;
+            }
+        }
+        else {
+            user = userResult.recordset[0];
+            // If user exists but email wasn't verified, update it
+            if (!user.email_verified) {
+                await database_1.pool.request().input("userId", user.id).query(`
+            UPDATE users
+            SET email_verified = 1
+            WHERE id = @userId
+          `);
+                user.email_verified = true;
+            }
+        }
+        // Check if user is admin
+        const adminCheck = await database_1.pool
+            .request()
+            .input("userId", user.id)
+            .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
+        const userRole = adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
+        // Generate JWT token
+        const token = jsonwebtoken_1.default.sign({
+            userId: user.id,
+            email: user.email,
+            role: userRole,
+        }, JWT_SECRET);
+        // Create session
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+        await database_1.pool
+            .request()
+            .input("userId", user.id)
+            .input("token", token)
+            .input("deviceName", req.get("user-agent") || "Unknown")
+            .input("ipAddress", req.ip)
+            .input("expiresAt", expiresAt).query(`
+        INSERT INTO sessions (user_id, token, device_name, ip_address, is_current, expires_at)
+        VALUES (@userId, @token, @deviceName, @ipAddress, 1, @expiresAt)
+      `);
+        // Log success
+        await (0, security_middleware_1.logSecurityEvent)("LOGIN_SUCCESS", req, user.id, facebookUser.email, {
+            method: "facebook",
             isNewUser,
         });
         return {
