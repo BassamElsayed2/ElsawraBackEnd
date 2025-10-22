@@ -187,4 +187,45 @@ export class AuthController {
       });
     }
   );
+
+  // Facebook Sign In
+  static facebookSignIn = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { accessToken } = req.body;
+
+      if (!accessToken) {
+        return res.status(400).json({
+          success: false,
+          message: "Facebook access token is required",
+        });
+      }
+
+      const result = await AuthService.facebookSignIn(accessToken, req);
+
+      // Determine cookie name based on user role
+      const isAdmin = ["admin", "super_admin", "manager"].includes(
+        result.user.role || ""
+      );
+      const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
+
+      // Set httpOnly cookie
+      res.cookie(cookieName, result.token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({
+        success: true,
+        message: result.isNewUser
+          ? "Account created successfully with Facebook"
+          : "Logged in successfully with Facebook",
+        data: {
+          user: result.user,
+          isNewUser: result.isNewUser,
+        },
+      });
+    }
+  );
 }

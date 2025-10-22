@@ -35,6 +35,12 @@ router.post(
   validateBody(z.object({ idToken: z.string().min(1) })),
   AuthController.googleSignIn
 );
+router.post(
+  "/facebook",
+  authLimiter,
+  validateBody(z.object({ accessToken: z.string().min(1) })),
+  AuthController.facebookSignIn
+);
 
 // Check if phone exists (public)
 router.post(
