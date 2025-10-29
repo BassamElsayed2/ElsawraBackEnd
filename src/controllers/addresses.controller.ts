@@ -257,6 +257,21 @@ export class AddressesController {
         });
       }
 
+      // Check if address is linked to any orders
+      const ordersCheck = await pool.request().input("addressId", id).query(`
+          SELECT COUNT(*) as order_count 
+          FROM orders 
+          WHERE address_id = @addressId
+        `);
+
+      if (ordersCheck.recordset[0].order_count > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot delete address. It is linked to existing orders.",
+          code: "ADDRESS_HAS_ORDERS",
+        });
+      }
+
       await pool.request().input("id", id).query(`
           DELETE FROM addresses
           WHERE id = @id

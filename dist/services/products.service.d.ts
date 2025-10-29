@@ -2,6 +2,7 @@ export interface ProductFilters {
     category_id?: string;
     search?: string;
     is_active?: boolean;
+    branch_id?: string;
 }
 export declare class ProductsService {
     static getProducts(page?: number, limit?: number, filters?: ProductFilters): Promise<{

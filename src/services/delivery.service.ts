@@ -15,7 +15,7 @@ export interface DeliveryFeeConfig {
 export interface CalculateDeliveryFeeParams {
   user_latitude: number;
   user_longitude: number;
-  branch_id?: string; // Optional: if provided, calculate to specific branch
+  branch_id?: string; // Branch ID selected by user
 }
 
 export interface CalculateDeliveryFeeResult {
@@ -61,16 +61,33 @@ export class DeliveryService {
     if (branchesResult.recordset.length === 0) {
       throw new ApiError(
         404,
-        "No active branches found with valid coordinates"
+        branch_id
+          ? "Branch not found or inactive"
+          : "No active branches found with valid coordinates"
       );
     }
 
-    // Find nearest branch
-    const nearest = findNearestBranch(
-      user_latitude,
-      user_longitude,
-      branchesResult.recordset
-    );
+    // If branch_id provided, calculate distance to that specific branch
+    // Otherwise, find nearest branch
+    let nearest;
+    if (branch_id) {
+      // User selected a specific branch
+      const branch = branchesResult.recordset[0];
+      const distance = calculateDistance(
+        user_latitude,
+        user_longitude,
+        branch.latitude,
+        branch.longitude
+      );
+      nearest = { branch, distance };
+    } else {
+      // Find nearest branch (backward compatibility)
+      nearest = findNearestBranch(
+        user_latitude,
+        user_longitude,
+        branchesResult.recordset
+      );
+    }
 
     if (!nearest) {
       throw new ApiError(500, "Failed to calculate distance");

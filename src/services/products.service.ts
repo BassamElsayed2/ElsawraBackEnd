@@ -5,6 +5,7 @@ export interface ProductFilters {
   category_id?: string;
   search?: string;
   is_active?: boolean;
+  branch_id?: string; // Filter products by branch
 }
 
 export class ProductsService {
@@ -34,6 +35,15 @@ export class ProductsService {
     if (filters.is_active !== undefined) {
       whereConditions.push("p.is_active = @isActive");
       request.input("isActive", filters.is_active);
+    }
+
+    // Filter by branch - show products available in this branch
+    // OR products that are not linked to any branch (for backward compatibility)
+    if (filters.branch_id) {
+      whereConditions.push(
+        "(EXISTS (SELECT 1 FROM branch_products bp WHERE bp.product_id = p.id AND bp.branch_id = @branchId AND bp.is_available = 1) OR NOT EXISTS (SELECT 1 FROM branch_products bp2 WHERE bp2.product_id = p.id))"
+      );
+      request.input("branchId", filters.branch_id);
     }
 
     const whereClause =
@@ -151,6 +161,9 @@ export class ProductsService {
     }
     if (filters.is_active !== undefined) {
       countRequest.input("isActive", filters.is_active);
+    }
+    if (filters.branch_id) {
+      countRequest.input("branchId", filters.branch_id);
     }
 
     const countResult = await countRequest.query(`

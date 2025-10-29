@@ -10,8 +10,8 @@ exports.ProductsController = ProductsController;
 _a = ProductsController;
 // Get all products
 ProductsController.getProducts = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const { page, limit, category_id, search, is_active } = req.query;
-    const result = await products_service_1.ProductsService.getProducts(parseInt(page) || 1, parseInt(limit) || 10, { category_id, search, is_active });
+    const { page, limit, category_id, search, is_active, branch_id } = req.query;
+    const result = await products_service_1.ProductsService.getProducts(parseInt(page) || 1, parseInt(limit) || 10, { category_id, search, is_active, branch_id });
     res.json({
         success: true,
         data: result,

@@ -7,12 +7,13 @@ export class ProductsController {
   // Get all products
   static getProducts = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {
-      const { page, limit, category_id, search, is_active } = req.query as any;
+      const { page, limit, category_id, search, is_active, branch_id } =
+        req.query as any;
 
       const result = await ProductsService.getProducts(
         parseInt(page) || 1,
         parseInt(limit) || 10,
-        { category_id, search, is_active }
+        { category_id, search, is_active, branch_id }
       );
 
       res.json({

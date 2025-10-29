@@ -26,10 +26,23 @@ class DeliveryService {
         }
         const branchesResult = await request.query(branchQuery);
         if (branchesResult.recordset.length === 0) {
-            throw new error_middleware_1.ApiError(404, "No active branches found with valid coordinates");
+            throw new error_middleware_1.ApiError(404, branch_id
+                ? "Branch not found or inactive"
+                : "No active branches found with valid coordinates");
         }
-        // Find nearest branch
-        const nearest = (0, distance_1.findNearestBranch)(user_latitude, user_longitude, branchesResult.recordset);
+        // If branch_id provided, calculate distance to that specific branch
+        // Otherwise, find nearest branch
+        let nearest;
+        if (branch_id) {
+            // User selected a specific branch
+            const branch = branchesResult.recordset[0];
+            const distance = (0, distance_1.calculateDistance)(user_latitude, user_longitude, branch.latitude, branch.longitude);
+            nearest = { branch, distance };
+        }
+        else {
+            // Find nearest branch (backward compatibility)
+            nearest = (0, distance_1.findNearestBranch)(user_latitude, user_longitude, branchesResult.recordset);
+        }
         if (!nearest) {
             throw new error_middleware_1.ApiError(500, "Failed to calculate distance");
         }

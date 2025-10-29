@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { CategoriesController } from "../controllers/categories.controller";
+import { BranchProductsController } from "../controllers/branch-products.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
@@ -49,6 +50,49 @@ router.delete(
   adminMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   CategoriesController.deleteCategory
+);
+
+// ============================================
+// CATEGORY-BRANCH MANAGEMENT ROUTES
+// ============================================
+
+// Get branches for a category
+router.get(
+  "/:categoryId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ categoryId: z.string().uuid() })),
+  BranchProductsController.getCategoryBranches
+);
+
+// Update category branches (replace all)
+router.put(
+  "/:categoryId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ categoryId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.updateCategoryBranches
+);
+
+// Add category to branches
+router.post(
+  "/:categoryId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ categoryId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.addCategoryToBranches
+);
+
+// Remove category from branches
+router.delete(
+  "/:categoryId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ categoryId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.removeCategoryFromBranches
 );
 
 export default router;

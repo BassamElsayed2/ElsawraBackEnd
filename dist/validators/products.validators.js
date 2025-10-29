@@ -45,6 +45,7 @@ exports.getProductsQuerySchema = zod_1.z.object({
     page: zod_1.z.string().regex(/^\d+$/).transform(Number).optional().default("1"),
     limit: zod_1.z.string().regex(/^\d+$/).transform(Number).optional().default("10"),
     category_id: validation_1.uuidSchema.optional(),
+    branch_id: validation_1.uuidSchema.optional(),
     search: zod_1.z.string().max(255).optional(),
     is_active: zod_1.z
         .enum(["true", "false"])

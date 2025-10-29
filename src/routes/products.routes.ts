@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { ProductsController } from "../controllers/products.controller";
+import { BranchProductsController } from "../controllers/branch-products.controller";
 import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
@@ -49,6 +50,49 @@ router.delete(
   adminMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   ProductsController.deleteProduct
+);
+
+// ============================================
+// PRODUCT-BRANCH MANAGEMENT ROUTES
+// ============================================
+
+// Get branches for a product
+router.get(
+  "/:productId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ productId: z.string().uuid() })),
+  BranchProductsController.getProductBranches
+);
+
+// Update product branches (replace all)
+router.put(
+  "/:productId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ productId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.updateProductBranches
+);
+
+// Add product to branches
+router.post(
+  "/:productId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ productId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.addProductToBranches
+);
+
+// Remove product from branches
+router.delete(
+  "/:productId/branches",
+  authMiddleware,
+  adminMiddleware,
+  validateParams(z.object({ productId: z.string().uuid() })),
+  validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
+  BranchProductsController.removeProductFromBranches
 );
 
 export default router;

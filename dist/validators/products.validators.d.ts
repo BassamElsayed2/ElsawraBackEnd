@@ -40,8 +40,8 @@ export declare const createProductSchema: z.ZodObject<{
         created_at: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -55,8 +55,8 @@ export declare const createProductSchema: z.ZodObject<{
         }[];
     }, {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -78,8 +78,8 @@ export declare const createProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -102,8 +102,8 @@ export declare const createProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -160,8 +160,8 @@ export declare const updateProductSchema: z.ZodObject<{
         created_at: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -175,8 +175,8 @@ export declare const updateProductSchema: z.ZodObject<{
         }[];
     }, {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -198,8 +198,8 @@ export declare const updateProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -223,8 +223,8 @@ export declare const updateProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        created_at?: string;
         product_id?: string;
+        created_at?: string;
         name_ar?: string;
         name_en?: string;
         sizes?: {
@@ -244,6 +244,7 @@ export declare const getProductsQuerySchema: z.ZodObject<{
     page: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
     limit: z.ZodDefault<z.ZodOptional<z.ZodEffects<z.ZodString, number, string>>>;
     category_id: z.ZodOptional<z.ZodString>;
+    branch_id: z.ZodOptional<z.ZodString>;
     search: z.ZodOptional<z.ZodString>;
     is_active: z.ZodOptional<z.ZodEffects<z.ZodEnum<["true", "false"]>, boolean, "true" | "false">>;
 }, "strip", z.ZodTypeAny, {
@@ -252,11 +253,13 @@ export declare const getProductsQuerySchema: z.ZodObject<{
     category_id?: string;
     is_active?: boolean;
     page?: number;
+    branch_id?: string;
 }, {
     limit?: string;
     search?: string;
     category_id?: string;
     is_active?: "true" | "false";
     page?: string;
+    branch_id?: string;
 }>;
 //# sourceMappingURL=products.validators.d.ts.map

@@ -49,6 +49,7 @@ export declare const createOrderSchema: z.ZodObject<{
     notes: z.ZodOptional<z.ZodString>;
     payment_method: z.ZodOptional<z.ZodEnum<["cash", "card", "wallet", "easykash"]>>;
 }, "strip", z.ZodTypeAny, {
+    branch_id?: string;
     items?: {
         type?: "product" | "offer";
         title_ar?: string;
@@ -65,13 +66,13 @@ export declare const createOrderSchema: z.ZodObject<{
     }[];
     address_id?: string;
     delivery_type?: "delivery" | "pickup";
-    branch_id?: string;
     subtotal?: number;
     delivery_fee?: number;
     total?: number;
     notes?: string;
     payment_method?: "cash" | "card" | "wallet" | "easykash";
 }, {
+    branch_id?: string;
     items?: {
         type?: "product" | "offer";
         title_ar?: string;
@@ -88,7 +89,6 @@ export declare const createOrderSchema: z.ZodObject<{
     }[];
     address_id?: string;
     delivery_type?: "delivery" | "pickup";
-    branch_id?: string;
     subtotal?: number;
     delivery_fee?: number;
     total?: number;
