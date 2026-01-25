@@ -79,20 +79,20 @@ app.use("/uploads", (req, res, next) => {
     next();
 }, express_1.default.static("uploads"));
 // API routes
-app.use("/api/auth", auth_routes_1.default);
-app.use("/api/products", products_routes_1.default);
-app.use("/api/categories", categories_routes_1.default);
-app.use("/api/orders", orders_routes_1.default);
-app.use("/api/offers", offers_routes_1.default);
-app.use("/api/combo-offers", comboOffers_routes_1.default);
-app.use("/api/admin", admin_routes_1.default);
-app.use("/api/upload", upload_routes_1.default);
-app.use("/api/branches", branches_routes_1.default);
-app.use("/api/qrcode", qrcode_routes_1.default);
-app.use("/api/feedback", feedback_routes_1.default);
-app.use("/api/addresses", addresses_routes_1.default);
-app.use("/api/delivery", delivery_routes_1.default);
-app.use("/api/payments", payment_routes_1.default);
+app.use("/auth", auth_routes_1.default);
+app.use("/products", products_routes_1.default);
+app.use("/categories", categories_routes_1.default);
+app.use("/orders", orders_routes_1.default);
+app.use("/offers", offers_routes_1.default);
+app.use("/combo-offers", comboOffers_routes_1.default);
+app.use("/admin", admin_routes_1.default);
+app.use("/upload", upload_routes_1.default);
+app.use("/branches", branches_routes_1.default);
+app.use("/qrcode", qrcode_routes_1.default);
+app.use("/feedback", feedback_routes_1.default);
+app.use("/addresses", addresses_routes_1.default);
+app.use("/delivery", delivery_routes_1.default);
+app.use("/payments", payment_routes_1.default);
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({

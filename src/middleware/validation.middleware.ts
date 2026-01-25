@@ -46,7 +46,7 @@ export function validateBody(schema: ZodSchema) {
 
         return res.status(400).json({
           success: false,
-          message: "Validation failed",
+          message: "فشل التحقق من البيانات",
           errors,
         });
       }
@@ -71,7 +71,7 @@ export function validateQuery(schema: ZodSchema) {
 
         return res.status(400).json({
           success: false,
-          message: "Invalid query parameters",
+          message: "معاملات الاستعلام غير صحيحة",
           errors,
         });
       }
@@ -96,7 +96,7 @@ export function validateParams(schema: ZodSchema) {
 
         return res.status(400).json({
           success: false,
-          message: "Invalid parameters",
+          message: "المعاملات غير صحيحة",
           errors,
         });
       }
