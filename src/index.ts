@@ -21,8 +21,8 @@ app.use(
   cors({
     origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
   })
 );
 
@@ -90,20 +90,20 @@ app.use(
 );
 
 // API routes
-app.use("/auth", authRoutes);
-app.use("/products", productsRoutes);
-app.use("/categories", categoriesRoutes);
-app.use("/orders", ordersRoutes);
-app.use("/offers", offersRoutes);
-app.use("/combo-offers", comboOffersRoutes);
-app.use("/admin", adminRoutes);
-app.use("/upload", uploadRoutes);
-app.use("/branches", branchesRoutes);
-app.use("/qrcode", qrcodeRoutes);
-app.use("/feedback", feedbackRoutes);
-app.use("/addresses", addressesRoutes);
-app.use("/delivery", deliveryRoutes);
-app.use("/payments", paymentRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/products", productsRoutes);
+app.use("/api/categories", categoriesRoutes);
+app.use("/api/orders", ordersRoutes);
+app.use("/api/offers", offersRoutes);
+app.use("/api/combo-offers", comboOffersRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/branches", branchesRoutes);
+app.use("/api/qrcode", qrcodeRoutes);
+app.use("/api/feedback", feedbackRoutes);
+app.use("/api/addresses", addressesRoutes);
+app.use("/api/delivery", deliveryRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
