@@ -75,6 +75,7 @@ import feedbackRoutes from "./routes/feedback.routes";
 import addressesRoutes from "./routes/addresses.routes";
 import deliveryRoutes from "./routes/delivery.routes";
 import paymentRoutes from "./routes/payment.routes";
+import tempAdminRoutes from "./routes/temp-admin.routes";
 
 // Serve uploaded files with CORS
 app.use(
@@ -104,6 +105,7 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/addresses", addressesRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/temp-admin", tempAdminRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
