@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { logger } from "../utils/logger";
 import {
-  SupabaseUploadService,
+  LocalUploadService,
   BUCKETS,
-} from "../services/supabase-upload.service";
+} from "../services/local-upload.service";
 
 export const uploadController = {
   // Generic image upload
@@ -35,17 +35,17 @@ export const uploadController = {
         return;
       }
 
-      // Ensure bucket exists
-      await SupabaseUploadService.createBucket(bucket);
+      // Ensure bucket directory exists
+      await LocalUploadService.createBucket(bucket);
 
-      // Upload to Supabase
-      const { url, path } = await SupabaseUploadService.uploadFile(
+      // Upload to local uploads folder
+      const { url, path } = await LocalUploadService.uploadFile(
         req.file,
         bucket,
         folder
       );
 
-      logger.info(`Image uploaded to Supabase: ${path} in bucket: ${bucket}`);
+      logger.info(`Image uploaded to uploads folder: ${path} in bucket: ${bucket}`);
 
       res.status(200).json({
         success: true,
@@ -70,7 +70,7 @@ export const uploadController = {
     }
   },
 
-  // Upload branch image
+  // Upload branch image (saved to uploads/branches like generic upload)
   uploadBranchImage: async (
     req: Request,
     res: Response,
@@ -85,25 +85,24 @@ export const uploadController = {
         return;
       }
 
-      // Get file info
-      const file = req.file;
+      await LocalUploadService.createBucket(BUCKETS.BRANCHES);
+      const { url } = await LocalUploadService.uploadFile(
+        req.file,
+        BUCKETS.BRANCHES,
+        "branches"
+      );
 
-      // Build full URL for the image using API_URL from environment
-      const apiUrl =
-        process.env.API_URL || `${req.protocol}://${req.get("host")}`;
-      const imageUrl = `${apiUrl}/uploads/${file.filename}`;
-
-      logger.info(`Branch image uploaded: ${file.filename}`);
+      logger.info(`Branch image uploaded: ${req.file.originalname}`);
 
       res.status(200).json({
         success: true,
         message: "Image uploaded successfully",
-        imageUrl,
+        imageUrl: url,
         file: {
-          filename: file.filename,
-          originalName: file.originalname,
-          size: file.size,
-          mimetype: file.mimetype,
+          filename: req.file.originalname,
+          originalName: req.file.originalname,
+          size: req.file.size,
+          mimetype: req.file.mimetype,
         },
       });
     } catch (error) {
@@ -139,10 +138,10 @@ export const uploadController = {
         return;
       }
 
-      // Delete from Supabase
-      await SupabaseUploadService.deleteFile(bucket, path);
+      // Delete from local uploads folder
+      await LocalUploadService.deleteFile(bucket, path);
 
-      logger.info(`Image deleted from Supabase: ${path} in bucket: ${bucket}`);
+      logger.info(`Image deleted from uploads folder: ${path} in bucket: ${bucket}`);
 
       res.status(200).json({
         success: true,

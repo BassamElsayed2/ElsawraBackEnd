@@ -21,7 +21,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@supabase/supabase-js": "^2.75.0",
     "@types/qrcode": "^1.5.5",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",

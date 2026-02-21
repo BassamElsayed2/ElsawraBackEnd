@@ -43,3 +43,6 @@ coverage/
 temp/
 tmp/
 
+# Local uploads (images stored on server)
+
+

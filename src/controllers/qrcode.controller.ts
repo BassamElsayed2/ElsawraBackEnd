@@ -5,9 +5,9 @@ import { logger } from "../utils/logger";
 import sql from "mssql";
 import { AuthRequest } from "../types";
 import {
-  SupabaseUploadService,
+  LocalUploadService,
   BUCKETS,
-} from "../services/supabase-upload.service";
+} from "../services/local-upload.service";
 
 export const qrcodeController = {
   // Generate QR Code for a branch
@@ -94,12 +94,12 @@ export const qrcodeController = {
 
       logger.info(`QR Code generated for branch ${branchId}: ${filename}`);
 
-      // Upload to Supabase
-      const uploadResult = await SupabaseUploadService.uploadBuffer(
+      // Upload to local uploads folder
+      const uploadResult = await LocalUploadService.uploadBuffer(
         qrBuffer,
         filename,
         BUCKETS.QR_IMAGES,
-        undefined, // No folder, upload to root of bucket
+        undefined,
         "image/png"
       );
 
@@ -107,7 +107,7 @@ export const qrcodeController = {
       const storagePath = uploadResult.path;
 
       logger.info(
-        `QR Code uploaded to Supabase: ${qrCodeUrl} (path: ${storagePath})`
+        `QR Code uploaded to uploads folder: ${qrCodeUrl} (path: ${storagePath})`
       );
 
       // Save to database
@@ -115,7 +115,7 @@ export const qrcodeController = {
         .request()
         .input("branch_id", sql.UniqueIdentifier, branchId)
         .input("qr_code_url", sql.NVarChar, qrCodeUrl)
-        .input("qr_code_filename", sql.NVarChar, storagePath) // Store Supabase path for deletion
+        .input("qr_code_filename", sql.NVarChar, storagePath) // Store path for deletion
         .input("survey_url", sql.NVarChar, surveyUrl).query(`
           INSERT INTO branch_qrcodes (branch_id, qr_code_url, qr_code_filename, survey_url)
           OUTPUT INSERTED.*
@@ -247,19 +247,18 @@ export const qrcodeController = {
 
       const qrCode = qrCodeResult.recordset[0];
 
-      // Delete file from Supabase
-      // qr_code_filename now contains the Supabase storage path
+      // Delete file from local uploads folder
       try {
-        await SupabaseUploadService.deleteFile(
+        await LocalUploadService.deleteFile(
           BUCKETS.QR_IMAGES,
           qrCode.qr_code_filename
         );
         logger.info(
-          `QR Code deleted from Supabase: ${qrCode.qr_code_filename}`
+          `QR Code deleted from uploads folder: ${qrCode.qr_code_filename}`
         );
       } catch (err) {
         logger.warn(
-          `Could not delete QR Code from Supabase: ${qrCode.qr_code_filename}`,
+          `Could not delete QR Code file: ${qrCode.qr_code_filename}`,
           err
         );
       }
