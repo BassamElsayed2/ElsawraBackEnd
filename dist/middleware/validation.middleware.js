@@ -44,7 +44,7 @@ function validateBody(schema) {
                 }));
                 return res.status(400).json({
                     success: false,
-                    message: "Validation failed",
+                    message: "فشل التحقق من البيانات",
                     errors,
                 });
             }
@@ -68,7 +68,7 @@ function validateQuery(schema) {
                 }));
                 return res.status(400).json({
                     success: false,
-                    message: "Invalid query parameters",
+                    message: "معاملات الاستعلام غير صحيحة",
                     errors,
                 });
             }
@@ -92,7 +92,7 @@ function validateParams(schema) {
                 }));
                 return res.status(400).json({
                     success: false,
-                    message: "Invalid parameters",
+                    message: "المعاملات غير صحيحة",
                     errors,
                 });
             }

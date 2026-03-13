@@ -8,7 +8,7 @@ const qrcode_1 = __importDefault(require("qrcode"));
 const database_1 = require("../config/database");
 const logger_1 = require("../utils/logger");
 const mssql_1 = __importDefault(require("mssql"));
-const supabase_upload_service_1 = require("../services/supabase-upload.service");
+const local_upload_service_1 = require("../services/local-upload.service");
 exports.qrcodeController = {
     // Generate QR Code for a branch
     generateQRCode: async (req, res, next) => {
@@ -74,18 +74,17 @@ exports.qrcodeController = {
                 },
             });
             logger_1.logger.info(`QR Code generated for branch ${branchId}: ${filename}`);
-            // Upload to Supabase
-            const uploadResult = await supabase_upload_service_1.SupabaseUploadService.uploadBuffer(qrBuffer, filename, supabase_upload_service_1.BUCKETS.QR_IMAGES, undefined, // No folder, upload to root of bucket
-            "image/png");
+            // Upload to local uploads folder
+            const uploadResult = await local_upload_service_1.LocalUploadService.uploadBuffer(qrBuffer, filename, local_upload_service_1.BUCKETS.QR_IMAGES, undefined, "image/png");
             const qrCodeUrl = uploadResult.url;
             const storagePath = uploadResult.path;
-            logger_1.logger.info(`QR Code uploaded to Supabase: ${qrCodeUrl} (path: ${storagePath})`);
+            logger_1.logger.info(`QR Code uploaded to uploads folder: ${qrCodeUrl} (path: ${storagePath})`);
             // Save to database
             const result = await database_1.pool
                 .request()
                 .input("branch_id", mssql_1.default.UniqueIdentifier, branchId)
                 .input("qr_code_url", mssql_1.default.NVarChar, qrCodeUrl)
-                .input("qr_code_filename", mssql_1.default.NVarChar, storagePath) // Store Supabase path for deletion
+                .input("qr_code_filename", mssql_1.default.NVarChar, storagePath) // Store path for deletion
                 .input("survey_url", mssql_1.default.NVarChar, surveyUrl).query(`
           INSERT INTO branch_qrcodes (branch_id, qr_code_url, qr_code_filename, survey_url)
           OUTPUT INSERTED.*
@@ -193,14 +192,13 @@ exports.qrcodeController = {
                 return;
             }
             const qrCode = qrCodeResult.recordset[0];
-            // Delete file from Supabase
-            // qr_code_filename now contains the Supabase storage path
+            // Delete file from local uploads folder
             try {
-                await supabase_upload_service_1.SupabaseUploadService.deleteFile(supabase_upload_service_1.BUCKETS.QR_IMAGES, qrCode.qr_code_filename);
-                logger_1.logger.info(`QR Code deleted from Supabase: ${qrCode.qr_code_filename}`);
+                await local_upload_service_1.LocalUploadService.deleteFile(local_upload_service_1.BUCKETS.QR_IMAGES, qrCode.qr_code_filename);
+                logger_1.logger.info(`QR Code deleted from uploads folder: ${qrCode.qr_code_filename}`);
             }
             catch (err) {
-                logger_1.logger.warn(`Could not delete QR Code from Supabase: ${qrCode.qr_code_filename}`, err);
+                logger_1.logger.warn(`Could not delete QR Code file: ${qrCode.qr_code_filename}`, err);
             }
             // Delete from database
             await database_1.pool

@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sql = exports.connectDB = exports.pool = void 0;
+exports.sql = exports.isDatabaseConnected = exports.connectDB = exports.pool = void 0;
 const mssql_1 = __importDefault(require("mssql"));
 exports.sql = mssql_1.default;
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -30,18 +30,30 @@ const config = {
 };
 // Create connection pool
 exports.pool = new mssql_1.default.ConnectionPool(config);
+let isConnected = false;
+const RETRY_DELAY_MS = 5000;
 // Connect to database
 const connectDB = async () => {
     try {
+        if (exports.pool.connected) {
+            isConnected = true;
+            return;
+        }
         await exports.pool.connect();
-        logger_1.logger.info("✅ Connected to SQL Server database");
+        isConnected = true;
+        logger_1.logger.info("Connected to SQL Server database");
     }
     catch (error) {
-        logger_1.logger.error("❌ Failed to connect to SQL Server:", error);
-        process.exit(1);
+        isConnected = false;
+        logger_1.logger.error("Failed to connect to SQL Server. Retrying in 5s...", error);
+        setTimeout(() => {
+            void (0, exports.connectDB)();
+        }, RETRY_DELAY_MS);
     }
 };
 exports.connectDB = connectDB;
 // Initialize connection
-(0, exports.connectDB)();
+void (0, exports.connectDB)();
+const isDatabaseConnected = () => isConnected;
+exports.isDatabaseConnected = isDatabaseConnected;
 //# sourceMappingURL=database.js.map

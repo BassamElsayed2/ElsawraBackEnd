@@ -6,7 +6,7 @@ export declare const createProductSchema: z.ZodObject<{
     description_en: z.ZodOptional<z.ZodString>;
     category_id: z.ZodString;
     user_id: z.ZodOptional<z.ZodString>;
-    image_url: z.ZodOptional<z.ZodString>;
+    image_url: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     types: z.ZodArray<z.ZodObject<{
         id: z.ZodOptional<z.ZodString>;
         product_id: z.ZodOptional<z.ZodString>;
@@ -125,7 +125,7 @@ export declare const updateProductSchema: z.ZodObject<{
     description_en: z.ZodOptional<z.ZodString>;
     category_id: z.ZodOptional<z.ZodString>;
     user_id: z.ZodOptional<z.ZodString>;
-    image_url: z.ZodOptional<z.ZodString>;
+    image_url: z.ZodUnion<[z.ZodOptional<z.ZodString>, z.ZodLiteral<"">]>;
     is_active: z.ZodOptional<z.ZodBoolean>;
     types: z.ZodOptional<z.ZodArray<z.ZodObject<{
         id: z.ZodOptional<z.ZodString>;

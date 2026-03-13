@@ -5,13 +5,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware";
 import { logger } from "./utils/logger";
-import { pool } from "./config/database";
+import { isDatabaseConnected } from "./config/database";
 
 // Load environment variables
 dotenv.config();
 
 const app: Express = express();
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT);
 
 // Security middleware
 app.use(helmet());
@@ -23,7 +23,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
-  })
+  }),
 );
 
 // Body parsing middleware
@@ -42,21 +42,11 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 
 // Health check endpoint
 app.get("/health", async (_req: Request, res: Response) => {
-  try {
-    // Check database connection
-    await pool.request().query("SELECT 1");
-    res.status(200).json({
-      status: "healthy",
-      timestamp: new Date().toISOString(),
-      database: "connected",
-    });
-  } catch (error) {
-    res.status(503).json({
-      status: "unhealthy",
-      timestamp: new Date().toISOString(),
-      database: "disconnected",
-    });
-  }
+  res.status(200).json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    database: isDatabaseConnected() ? "connected" : "disconnected",
+  });
 });
 
 // Import routes
@@ -87,7 +77,7 @@ app.use(
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
   },
-  express.static("uploads")
+  express.static("uploads"),
 );
 
 // API routes
@@ -124,7 +114,7 @@ const server = app.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
   logger.info(`📝 Environment: ${process.env.NODE_ENV}`);
   logger.info(
-    `🔗 API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`
+    `🔗 API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`,
   );
 });
 
@@ -133,7 +123,6 @@ process.on("SIGTERM", () => {
   logger.info("SIGTERM signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");
-    pool.close();
     process.exit(0);
   });
 });
@@ -142,7 +131,6 @@ process.on("SIGINT", () => {
   logger.info("SIGINT signal received: closing HTTP server");
   server.close(() => {
     logger.info("HTTP server closed");
-    pool.close();
     process.exit(0);
   });
 });

@@ -14,15 +14,15 @@ const database_1 = require("./config/database");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-const PORT = process.env.PORT;
+const PORT = Number(process.env.PORT);
 // Security middleware
 app.use((0, helmet_1.default)());
 // CORS configuration
 app.use((0, cors_1.default)({
     origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
 }));
 // Body parsing middleware
 app.use(express_1.default.json({ limit: "10mb" }));
@@ -38,22 +38,11 @@ app.use((req, _res, next) => {
 });
 // Health check endpoint
 app.get("/health", async (_req, res) => {
-    try {
-        // Check database connection
-        await database_1.pool.request().query("SELECT 1");
-        res.status(200).json({
-            status: "healthy",
-            timestamp: new Date().toISOString(),
-            database: "connected",
-        });
-    }
-    catch (error) {
-        res.status(503).json({
-            status: "unhealthy",
-            timestamp: new Date().toISOString(),
-            database: "disconnected",
-        });
-    }
+    res.status(200).json({
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        database: (0, database_1.isDatabaseConnected)() ? "connected" : "disconnected",
+    });
 });
 // Import routes
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
@@ -70,6 +59,7 @@ const feedback_routes_1 = __importDefault(require("./routes/feedback.routes"));
 const addresses_routes_1 = __importDefault(require("./routes/addresses.routes"));
 const delivery_routes_1 = __importDefault(require("./routes/delivery.routes"));
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
+const temp_admin_routes_1 = __importDefault(require("./routes/temp-admin.routes"));
 // Serve uploaded files with CORS
 app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -79,20 +69,21 @@ app.use("/uploads", (req, res, next) => {
     next();
 }, express_1.default.static("uploads"));
 // API routes
-app.use("/auth", auth_routes_1.default);
-app.use("/products", products_routes_1.default);
-app.use("/categories", categories_routes_1.default);
-app.use("/orders", orders_routes_1.default);
-app.use("/offers", offers_routes_1.default);
-app.use("/combo-offers", comboOffers_routes_1.default);
-app.use("/admin", admin_routes_1.default);
-app.use("/upload", upload_routes_1.default);
-app.use("/branches", branches_routes_1.default);
-app.use("/qrcode", qrcode_routes_1.default);
-app.use("/feedback", feedback_routes_1.default);
-app.use("/addresses", addresses_routes_1.default);
-app.use("/delivery", delivery_routes_1.default);
-app.use("/payments", payment_routes_1.default);
+app.use("/api/auth", auth_routes_1.default);
+app.use("/api/products", products_routes_1.default);
+app.use("/api/categories", categories_routes_1.default);
+app.use("/api/orders", orders_routes_1.default);
+app.use("/api/offers", offers_routes_1.default);
+app.use("/api/combo-offers", comboOffers_routes_1.default);
+app.use("/api/admin", admin_routes_1.default);
+app.use("/api/upload", upload_routes_1.default);
+app.use("/api/branches", branches_routes_1.default);
+app.use("/api/qrcode", qrcode_routes_1.default);
+app.use("/api/feedback", feedback_routes_1.default);
+app.use("/api/addresses", addresses_routes_1.default);
+app.use("/api/delivery", delivery_routes_1.default);
+app.use("/api/payments", payment_routes_1.default);
+app.use("/api/temp-admin", temp_admin_routes_1.default);
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({
@@ -114,7 +105,6 @@ process.on("SIGTERM", () => {
     logger_1.logger.info("SIGTERM signal received: closing HTTP server");
     server.close(() => {
         logger_1.logger.info("HTTP server closed");
-        database_1.pool.close();
         process.exit(0);
     });
 });
@@ -122,7 +112,6 @@ process.on("SIGINT", () => {
     logger_1.logger.info("SIGINT signal received: closing HTTP server");
     server.close(() => {
         logger_1.logger.info("HTTP server closed");
-        database_1.pool.close();
         process.exit(0);
     });
 });

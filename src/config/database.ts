@@ -26,20 +26,33 @@ const config: sql.config = {
 
 // Create connection pool
 export const pool = new sql.ConnectionPool(config);
+let isConnected = false;
+const RETRY_DELAY_MS = 5000;
 
 // Connect to database
 export const connectDB = async (): Promise<void> => {
   try {
+    if (pool.connected) {
+      isConnected = true;
+      return;
+    }
+
     await pool.connect();
-    logger.info("✅ Connected to SQL Server database");
+    isConnected = true;
+    logger.info("Connected to SQL Server database");
   } catch (error) {
-    logger.error("❌ Failed to connect to SQL Server:", error);
-    process.exit(1);
+    isConnected = false;
+    logger.error("Failed to connect to SQL Server. Retrying in 5s...", error);
+    setTimeout(() => {
+      void connectDB();
+    }, RETRY_DELAY_MS);
   }
 };
 
 // Initialize connection
-connectDB();
+void connectDB();
+
+export const isDatabaseConnected = (): boolean => isConnected;
 
 // Export sql for raw queries
 export { sql };

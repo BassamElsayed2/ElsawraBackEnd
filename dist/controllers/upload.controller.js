@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadController = void 0;
 const logger_1 = require("../utils/logger");
-const supabase_upload_service_1 = require("../services/supabase-upload.service");
+const local_upload_service_1 = require("../services/local-upload.service");
 exports.uploadController = {
     // Generic image upload
     uploadImage: async (req, res, next) => {
@@ -15,10 +15,10 @@ exports.uploadController = {
                 return;
             }
             // Get bucket and folder from request body
-            const bucket = req.body.bucket || supabase_upload_service_1.BUCKETS.PRODUCT_IMAGES;
+            const bucket = req.body.bucket || local_upload_service_1.BUCKETS.PRODUCT_IMAGES;
             const folder = req.body.folder;
             // Validate bucket
-            const validBuckets = Object.values(supabase_upload_service_1.BUCKETS);
+            const validBuckets = Object.values(local_upload_service_1.BUCKETS);
             if (!validBuckets.includes(bucket)) {
                 res.status(400).json({
                     success: false,
@@ -26,11 +26,11 @@ exports.uploadController = {
                 });
                 return;
             }
-            // Ensure bucket exists
-            await supabase_upload_service_1.SupabaseUploadService.createBucket(bucket);
-            // Upload to Supabase
-            const { url, path } = await supabase_upload_service_1.SupabaseUploadService.uploadFile(req.file, bucket, folder);
-            logger_1.logger.info(`Image uploaded to Supabase: ${path} in bucket: ${bucket}`);
+            // Ensure bucket directory exists
+            await local_upload_service_1.LocalUploadService.createBucket(bucket);
+            // Upload to local uploads folder
+            const { url, path } = await local_upload_service_1.LocalUploadService.uploadFile(req.file, bucket, folder);
+            logger_1.logger.info(`Image uploaded to uploads folder: ${path} in bucket: ${bucket}`);
             res.status(200).json({
                 success: true,
                 message: "Image uploaded successfully",
@@ -54,7 +54,7 @@ exports.uploadController = {
             next(error);
         }
     },
-    // Upload branch image
+    // Upload branch image (saved to uploads/branches like generic upload)
     uploadBranchImage: async (req, res, next) => {
         try {
             if (!req.file) {
@@ -64,21 +64,18 @@ exports.uploadController = {
                 });
                 return;
             }
-            // Get file info
-            const file = req.file;
-            // Build full URL for the image using API_URL from environment
-            const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
-            const imageUrl = `${apiUrl}/uploads/${file.filename}`;
-            logger_1.logger.info(`Branch image uploaded: ${file.filename}`);
+            await local_upload_service_1.LocalUploadService.createBucket(local_upload_service_1.BUCKETS.BRANCHES);
+            const { url } = await local_upload_service_1.LocalUploadService.uploadFile(req.file, local_upload_service_1.BUCKETS.BRANCHES, "branches");
+            logger_1.logger.info(`Branch image uploaded: ${req.file.originalname}`);
             res.status(200).json({
                 success: true,
                 message: "Image uploaded successfully",
-                imageUrl,
+                imageUrl: url,
                 file: {
-                    filename: file.filename,
-                    originalName: file.originalname,
-                    size: file.size,
-                    mimetype: file.mimetype,
+                    filename: req.file.originalname,
+                    originalName: req.file.originalname,
+                    size: req.file.size,
+                    mimetype: req.file.mimetype,
                 },
             });
         }
@@ -99,7 +96,7 @@ exports.uploadController = {
                 return;
             }
             // Validate bucket
-            const validBuckets = Object.values(supabase_upload_service_1.BUCKETS);
+            const validBuckets = Object.values(local_upload_service_1.BUCKETS);
             if (!validBuckets.includes(bucket)) {
                 res.status(400).json({
                     success: false,
@@ -107,9 +104,9 @@ exports.uploadController = {
                 });
                 return;
             }
-            // Delete from Supabase
-            await supabase_upload_service_1.SupabaseUploadService.deleteFile(bucket, path);
-            logger_1.logger.info(`Image deleted from Supabase: ${path} in bucket: ${bucket}`);
+            // Delete from local uploads folder
+            await local_upload_service_1.LocalUploadService.deleteFile(bucket, path);
+            logger_1.logger.info(`Image deleted from uploads folder: ${path} in bucket: ${bucket}`);
             res.status(200).json({
                 success: true,
                 message: "Image deleted successfully",
