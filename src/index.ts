@@ -11,7 +11,7 @@ import { isDatabaseConnected } from "./config/database";
 dotenv.config();
 
 const app: Express = express();
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 4015;
 
 // Security middleware
 app.use(helmet());
@@ -81,21 +81,21 @@ app.use(
 );
 
 // API routes
-app.use("/api/auth", authRoutes);
-app.use("/api/products", productsRoutes);
-app.use("/api/categories", categoriesRoutes);
-app.use("/api/orders", ordersRoutes);
-app.use("/api/offers", offersRoutes);
-app.use("/api/combo-offers", comboOffersRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/upload", uploadRoutes);
-app.use("/api/branches", branchesRoutes);
-app.use("/api/qrcode", qrcodeRoutes);
-app.use("/api/feedback", feedbackRoutes);
-app.use("/api/addresses", addressesRoutes);
-app.use("/api/delivery", deliveryRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/temp-admin", tempAdminRoutes);
+app.use("/auth", authRoutes);
+app.use("/products", productsRoutes);
+app.use("/categories", categoriesRoutes);
+app.use("/orders", ordersRoutes);
+app.use("/offers", offersRoutes);
+app.use("/combo-offers", comboOffersRoutes);
+app.use("/admin", adminRoutes);
+app.use("/upload", uploadRoutes);
+app.use("/branches", branchesRoutes);
+app.use("/qrcode", qrcodeRoutes);
+app.use("/feedback", feedbackRoutes);
+app.use("/addresses", addressesRoutes);
+app.use("/delivery", deliveryRoutes);
+app.use("/payments", paymentRoutes);
+app.use("/temp-admin", tempAdminRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -113,9 +113,7 @@ app.use(errorHandler);
 const server = app.listen(PORT, "0.0.0.0", () => {
   logger.info(`Server running on 0.0.0.0:${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
-  logger.info(
-    `API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`,
-  );
+  logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
 });
 
 // Graceful shutdown
