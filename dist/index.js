@@ -14,7 +14,7 @@ const database_1 = require("./config/database");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
-const PORT = Number(process.env.PORT);
+const PORT = Number(process.env.PORT) || 3000;
 // Security middleware
 app.use((0, helmet_1.default)());
 // CORS configuration
@@ -95,10 +95,10 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(error_middleware_1.errorHandler);
 // Start server
-const server = app.listen(PORT, () => {
-    logger_1.logger.info(`🚀 Server running on port ${PORT}`);
-    logger_1.logger.info(`📝 Environment: ${process.env.NODE_ENV}`);
-    logger_1.logger.info(`🔗 API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
+const server = app.listen(PORT, "0.0.0.0", () => {
+    logger_1.logger.info(`Server running on 0.0.0.0:${PORT}`);
+    logger_1.logger.info(`Environment: ${process.env.NODE_ENV}`);
+    logger_1.logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
 });
 // Graceful shutdown
 process.on("SIGTERM", () => {
@@ -114,6 +114,12 @@ process.on("SIGINT", () => {
         logger_1.logger.info("HTTP server closed");
         process.exit(0);
     });
+});
+process.on("uncaughtException", (error) => {
+    logger_1.logger.error("Uncaught Exception:", error);
+});
+process.on("unhandledRejection", (reason) => {
+    logger_1.logger.error("Unhandled Rejection:", reason);
 });
 exports.default = app;
 //# sourceMappingURL=index.js.map
