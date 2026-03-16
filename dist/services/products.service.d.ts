@@ -15,6 +15,9 @@ export declare class ProductsService {
     static getBestsellers(limit?: number, branch_id?: string): Promise<{
         products: any[];
         total: number;
+    } | {
+        products: import("mssql").IRecordSet<any>;
+        total: number;
     }>;
     static getProductById(id: string): Promise<any>;
     static createProduct(data: any): Promise<any>;

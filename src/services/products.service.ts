@@ -214,16 +214,102 @@ export class ProductsService {
     if (rows.length === 0) return { products: [], total: 0 };
 
     const productIds = rows.map((r) => r.id);
-    const products: any[] = [];
+    const productsRequest = pool.request();
+    const productWhereConditions = productIds
+      .map((_, index) => `p.id = @productId${index}`)
+      .join(" OR ");
+    productIds.forEach((id, index) => {
+      productsRequest.input(`productId${index}`, id);
+    });
 
-    for (const id of productIds) {
-      try {
-        const product = await this.getProductById(id);
-        products.push(product);
-      } catch {
-        // Skip if product was deleted
-      }
+    const productsResult = await productsRequest.query(`
+      SELECT
+        p.id, p.title_ar, p.title_en,
+        p.description_ar, p.description_en,
+        p.category_id, p.image_url, p.is_active,
+        p.created_at, p.updated_at,
+        c.name_ar as category_name_ar,
+        c.name_en as category_name_en
+      FROM products p
+      LEFT JOIN categories c ON p.category_id = c.id
+      WHERE ${productWhereConditions}
+    `);
+
+    const products = productsResult.recordset;
+    if (products.length === 0) return { products: [], total: 0 };
+
+    // Get all types for these products in one query
+    const existingProductIds = products.map((p) => p.id);
+    const typesRequest = pool.request();
+    const typeWhereConditions = existingProductIds
+      .map((_, index) => `product_id = @productId${index}`)
+      .join(" OR ");
+
+    existingProductIds.forEach((id, index) => {
+      typesRequest.input(`productId${index}`, id);
+    });
+
+    const typesResult = await typesRequest.query(`
+      SELECT id, product_id, name_ar, name_en, created_at
+      FROM product_types
+      WHERE ${typeWhereConditions}
+      ORDER BY created_at
+    `);
+
+    const types = typesResult.recordset;
+
+    if (types.length > 0) {
+      const typeIds = types.map((t) => t.id);
+      const sizesRequest = pool.request();
+      const sizeWhereConditions = typeIds
+        .map((_, index) => `type_id = @typeId${index}`)
+        .join(" OR ");
+
+      typeIds.forEach((id, index) => {
+        sizesRequest.input(`typeId${index}`, id);
+      });
+
+      const sizesResult = await sizesRequest.query(`
+        SELECT id, type_id, size_ar, size_en, price, offer_price, created_at
+        FROM product_sizes
+        WHERE ${sizeWhereConditions}
+        ORDER BY price
+      `);
+
+      const sizes = sizesResult.recordset;
+      const sizesMap = new Map<string, any[]>();
+      sizes.forEach((size) => {
+        if (!sizesMap.has(size.type_id)) sizesMap.set(size.type_id, []);
+        sizesMap.get(size.type_id)!.push(size);
+      });
+
+      types.forEach((type) => {
+        type.sizes = sizesMap.get(type.id) || [];
+      });
+    } else {
+      types.forEach((type) => {
+        type.sizes = [];
+      });
     }
+
+    const typesMap = new Map<string, any[]>();
+    types.forEach((type) => {
+      if (!typesMap.has(type.product_id)) typesMap.set(type.product_id, []);
+      typesMap.get(type.product_id)!.push(type);
+    });
+
+    products.forEach((product) => {
+      product.types = typesMap.get(product.id) || [];
+    });
+
+    // Keep same ranking order from bestseller query
+    const orderMap = new Map<string, number>();
+    rows.forEach((row, index) => orderMap.set(row.id, index));
+    products.sort((a, b) => {
+      const ai = orderMap.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bi = orderMap.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+      return ai - bi;
+    });
 
     return { products, total: products.length };
   }
