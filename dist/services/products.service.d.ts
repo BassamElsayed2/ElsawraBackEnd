@@ -12,6 +12,10 @@ export declare class ProductsService {
         limit: number;
         totalPages: number;
     }>;
+    static getBestsellers(limit?: number, branch_id?: string): Promise<{
+        products: any[];
+        total: number;
+    }>;
     static getProductById(id: string): Promise<any>;
     static createProduct(data: any): Promise<any>;
     static updateProduct(id: string, data: any): Promise<any>;

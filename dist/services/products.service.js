@@ -143,6 +143,46 @@ class ProductsService {
             totalPages: Math.ceil(total / limit),
         };
     }
+    // Get top products by order count (bestsellers) - only products that appear in orders
+    static async getBestsellers(limit = 10, branch_id) {
+        const request = database_1.pool.request().input("limit", limit);
+        const branchFilter = branch_id
+            ? "AND (EXISTS (SELECT 1 FROM branch_products bp WHERE bp.product_id = p.id AND bp.branch_id = @branchId AND bp.is_available = 1) OR NOT EXISTS (SELECT 1 FROM branch_products bp2 WHERE bp2.product_id = p.id))"
+            : "";
+        if (branch_id) {
+            request.input("branchId", branch_id);
+        }
+        const result = await request.query(`
+        SELECT TOP (@limit) items.product_id AS id, SUM(items.quantity) AS order_count
+        FROM orders o
+        CROSS APPLY OPENJSON(o.items) WITH (
+          product_id uniqueidentifier '$.product_id',
+          type nvarchar(20) '$.type',
+          quantity int '$.quantity'
+        ) AS items
+        INNER JOIN products p ON p.id = items.product_id
+        WHERE items.type = 'product'
+          AND items.product_id IS NOT NULL
+          ${branchFilter}
+        GROUP BY items.product_id
+        ORDER BY order_count DESC
+      `);
+        const rows = result.recordset;
+        if (rows.length === 0)
+            return { products: [], total: 0 };
+        const productIds = rows.map((r) => r.id);
+        const products = [];
+        for (const id of productIds) {
+            try {
+                const product = await this.getProductById(id);
+                products.push(product);
+            }
+            catch {
+                // Skip if product was deleted
+            }
+        }
+        return { products, total: products.length };
+    }
     // Get product by ID
     static async getProductById(id) {
         const productResult = await database_1.pool.request().input("id", id).query(`

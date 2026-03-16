@@ -10,6 +10,10 @@ const zod_1 = require("zod");
 const router = (0, express_1.Router)();
 // Public routes
 router.get("/", (0, validation_middleware_1.validateQuery)(products_validators_1.getProductsQuerySchema), products_controller_1.ProductsController.getProducts);
+router.get("/bestsellers", (0, validation_middleware_1.validateQuery)(zod_1.z.object({
+    limit: zod_1.z.string().regex(/^\d+$/).transform(Number).optional(),
+    branch_id: zod_1.z.string().uuid().optional(),
+})), products_controller_1.ProductsController.getBestsellers);
 router.get("/:id", (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), products_controller_1.ProductsController.getProductById);
 // Admin routes
 router.post("/", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateBody)(products_validators_1.createProductSchema), products_controller_1.ProductsController.createProduct);

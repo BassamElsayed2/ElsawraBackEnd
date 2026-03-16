@@ -23,6 +23,19 @@ export class ProductsController {
     }
   );
 
+  // Get bestsellers (top products by order count)
+  static getBestsellers = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { branch_id } = req.query as any;
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 20);
+      const result = await ProductsService.getBestsellers(limit, branch_id);
+      res.json({
+        success: true,
+        data: result,
+      });
+    }
+  );
+
   // Get product by ID
   static getProductById = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {

@@ -23,6 +23,16 @@ router.get(
   ProductsController.getProducts
 );
 router.get(
+  "/bestsellers",
+  validateQuery(
+    z.object({
+      limit: z.string().regex(/^\d+$/).transform(Number).optional(),
+      branch_id: z.string().uuid().optional(),
+    })
+  ),
+  ProductsController.getBestsellers
+);
+router.get(
   "/:id",
   validateParams(z.object({ id: z.string().uuid() })),
   ProductsController.getProductById

@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 export declare class ProductsController {
     static getProducts: (req: import("express").Request, res: Response, next: NextFunction) => void;
+    static getBestsellers: (req: import("express").Request, res: Response, next: NextFunction) => void;
     static getProductById: (req: import("express").Request, res: Response, next: NextFunction) => void;
     static createProduct: (req: import("express").Request, res: Response, next: NextFunction) => void;
     static updateProduct: (req: import("express").Request, res: Response, next: NextFunction) => void;

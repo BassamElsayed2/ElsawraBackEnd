@@ -17,6 +17,16 @@ ProductsController.getProducts = (0, error_middleware_1.asyncHandler)(async (req
         data: result,
     });
 });
+// Get bestsellers (top products by order count)
+ProductsController.getBestsellers = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+    const { branch_id } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 10, 20);
+    const result = await products_service_1.ProductsService.getBestsellers(limit, branch_id);
+    res.json({
+        success: true,
+        data: result,
+    });
+});
 // Get product by ID
 ProductsController.getProductById = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
     const { id } = req.params;
