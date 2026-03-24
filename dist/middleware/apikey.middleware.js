@@ -1,9 +1,40 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.apiKeyRouteMiddleware = exports.apiKeyRateLimiter = void 0;
 exports.decryptApiKey = decryptApiKey;
+const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const logger_1 = require("../utils/logger");
 const decrypt_1 = require("../utils/decrypt");
 require('dotenv').config();
+const apiKeyWindowMs = Number(process.env.API_KEY_RATE_WINDOW_MS) || 15 * 60 * 1000;
+const apiKeyMax = Number(process.env.API_KEY_RATE_LIMIT_MAX) || 100;
+/**
+ * Rate limit for routes protected by x-api-key.
+ * Keyed by IP (token in header changes with timestamp, so it cannot be the bucket key).
+ */
+exports.apiKeyRateLimiter = (0, express_rate_limit_1.default)({
+    windowMs: apiKeyWindowMs,
+    max: apiKeyMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+        const retryAfterSec = Math.ceil(apiKeyWindowMs / 1000);
+        res.status(429).json({
+            success: false,
+            error: "Too many requests",
+            message: "Too many requests with this API key route. Please try again later.",
+            retryAfter: retryAfterSec,
+        });
+    },
+});
+/**
+ * Use this array on routes: `router.use(...apiKeyRouteMiddleware)`
+ * Order: rate limit first, then decrypt/validate key.
+ */
+exports.apiKeyRouteMiddleware = [exports.apiKeyRateLimiter, decryptApiKey];
 /**
  * Middleware to decrypt x-api-key header if present
  * Decrypts the API key using ENCRYPTION_KEY from environment variables
