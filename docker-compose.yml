@@ -1,0 +1,18 @@
+services:
+  backend:
+    build: .
+    image: food-cms-backend:latest
+    ports:
+      - "4015:4015"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "4015"
+    volumes:
+      # يبقى بعد إعادة بناء الصورة / إعادة النشر
+      - uploads_data:/app/uploads
+    restart: unless-stopped
+
+volumes:
+  uploads_data:
