@@ -1,7 +1,7 @@
 node_modules
 dist
 .git
-uploads
+
 logs
 *.log
 .env
