@@ -10,8 +10,7 @@ services:
       NODE_ENV: production
       PORT: "4015"
     volumes:
-      # يبقى بعد إعادة بناء الصورة / إعادة النشر
-      - uploads_data:/app/uploads
+      - uploads_data:./uploads
     restart: unless-stopped
 
 volumes:
