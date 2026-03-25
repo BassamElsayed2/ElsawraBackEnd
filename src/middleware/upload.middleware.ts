@@ -1,6 +1,6 @@
 import multer from "multer";
 
-// Configure memory storage for Supabase uploads
+// Memory storage; files are written to disk by LocalUploadService
 const storage = multer.memoryStorage();
 
 // File filter - only allow images

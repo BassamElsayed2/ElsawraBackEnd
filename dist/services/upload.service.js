@@ -7,6 +7,7 @@ exports.UploadService = void 0;
 const sharp_1 = __importDefault(require("sharp"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const uploads_1 = require("../config/uploads");
 const error_middleware_1 = require("../middleware/error.middleware");
 class UploadService {
     // Process and optimize image
@@ -58,22 +59,17 @@ class UploadService {
             console.error("Failed to delete file:", error);
         }
     }
-    // Get file URL
+    // Get file URL for paths under the configured uploads directory
     static getFileUrl(filePath) {
-        const uploadsDir = process.env.UPLOAD_DIR || "./uploads";
-        const apiUrl = process.env.API_URL;
-        // Convert backslashes to forward slashes
-        let relativePath = filePath.replace(/\\/g, "/");
-        // Remove all possible uploads directory prefixes
-        relativePath = relativePath
-            .replace("./uploads/", "")
-            .replace("./uploads", "")
-            .replace("uploads/", "")
-            .replace("uploads", "");
-        // Remove leading slashes
-        relativePath = relativePath.replace(/^\/+/, "");
-        // Return URL with single /uploads/ prefix
-        return `${apiUrl}/uploads/${relativePath}`;
+        const apiUrl = process.env.API_URL || "";
+        const uploadsDir = (0, uploads_1.getUploadsDir)();
+        const normalized = path_1.default.resolve(filePath);
+        let rel = path_1.default.relative(uploadsDir, normalized).replace(/\\/g, "/");
+        if (rel.startsWith("..")) {
+            const m = normalized.replace(/\\/g, "/").match(/\/uploads\/(.+)$/i);
+            rel = m ? m[1] : path_1.default.basename(normalized);
+        }
+        return `${apiUrl}/uploads/${rel.replace(/^\/+/, "")}`;
     }
 }
 exports.UploadService = UploadService;

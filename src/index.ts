@@ -6,6 +6,7 @@ import cookieParser from "cookie-parser";
 import { errorHandler } from "./middleware/error.middleware";
 import { logger } from "./utils/logger";
 import { isDatabaseConnected } from "./config/database";
+import { ensureUploadsRootExists, getUploadsDir } from "./config/uploads";
 
 // Load environment variables
 dotenv.config();
@@ -77,7 +78,7 @@ app.use(
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
   },
-  express.static("uploads"),
+  express.static(getUploadsDir()),
 );
 
 // API routes
@@ -109,28 +110,28 @@ app.use((req: Request, res: Response) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-const server = app.listen(PORT, "0.0.0.0", () => {
-  logger.info(`Server running on 0.0.0.0:${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV}`);
-  logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
-});
-
-// Graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM signal received: closing HTTP server");
-  server.close(() => {
-    logger.info("HTTP server closed");
-    process.exit(0);
+// Start server (ensure uploads dir exists for empty volumes / first run)
+void ensureUploadsRootExists().then(() => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    logger.info(`Server running on 0.0.0.0:${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV}`);
+    logger.info(`Uploads directory: ${getUploadsDir()}`);
+    logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
   });
-});
 
-process.on("SIGINT", () => {
-  logger.info("SIGINT signal received: closing HTTP server");
-  server.close(() => {
-    logger.info("HTTP server closed");
-    process.exit(0);
-  });
+  process.on("SIGTERM", () => shutdown(server, "SIGTERM signal received"));
+  process.on("SIGINT", () => shutdown(server, "SIGINT signal received"));
+
+  function shutdown(s: typeof server, label: string) {
+    logger.info(`${label}: closing HTTP server`);
+    s.close(() => {
+      logger.info("HTTP server closed");
+      process.exit(0);
+    });
+  }
+}).catch((err) => {
+  logger.error("Failed to create uploads directory:", err);
+  process.exit(1);
 });
 
 process.on("uncaughtException", (error) => {

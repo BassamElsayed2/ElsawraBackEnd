@@ -11,6 +11,7 @@ const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const error_middleware_1 = require("./middleware/error.middleware");
 const logger_1 = require("./utils/logger");
 const database_1 = require("./config/database");
+const uploads_1 = require("./config/uploads");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -67,7 +68,7 @@ app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Headers", "Content-Type");
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     next();
-}, express_1.default.static("uploads"));
+}, express_1.default.static((0, uploads_1.getUploadsDir)()));
 // API routes
 app.use("/api/auth", auth_routes_1.default);
 app.use("/api/products", products_routes_1.default);
@@ -94,26 +95,26 @@ app.use((req, res) => {
 });
 // Error handling middleware (must be last)
 app.use(error_middleware_1.errorHandler);
-// Start server
-const server = app.listen(PORT, "0.0.0.0", () => {
-    logger_1.logger.info(`Server running on 0.0.0.0:${PORT}`);
-    logger_1.logger.info(`Environment: ${process.env.NODE_ENV}`);
-    logger_1.logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
-});
-// Graceful shutdown
-process.on("SIGTERM", () => {
-    logger_1.logger.info("SIGTERM signal received: closing HTTP server");
-    server.close(() => {
-        logger_1.logger.info("HTTP server closed");
-        process.exit(0);
+// Start server (ensure uploads dir exists for empty volumes / first run)
+void (0, uploads_1.ensureUploadsRootExists)().then(() => {
+    const server = app.listen(PORT, "0.0.0.0", () => {
+        logger_1.logger.info(`Server running on 0.0.0.0:${PORT}`);
+        logger_1.logger.info(`Environment: ${process.env.NODE_ENV}`);
+        logger_1.logger.info(`Uploads directory: ${(0, uploads_1.getUploadsDir)()}`);
+        logger_1.logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
     });
-});
-process.on("SIGINT", () => {
-    logger_1.logger.info("SIGINT signal received: closing HTTP server");
-    server.close(() => {
-        logger_1.logger.info("HTTP server closed");
-        process.exit(0);
-    });
+    process.on("SIGTERM", () => shutdown(server, "SIGTERM signal received"));
+    process.on("SIGINT", () => shutdown(server, "SIGINT signal received"));
+    function shutdown(s, label) {
+        logger_1.logger.info(`${label}: closing HTTP server`);
+        s.close(() => {
+            logger_1.logger.info("HTTP server closed");
+            process.exit(0);
+        });
+    }
+}).catch((err) => {
+    logger_1.logger.error("Failed to create uploads directory:", err);
+    process.exit(1);
 });
 process.on("uncaughtException", (error) => {
     logger_1.logger.error("Uncaught Exception:", error);

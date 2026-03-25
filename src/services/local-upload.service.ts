@@ -1,9 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
+import { getUploadsDir } from "../config/uploads";
 import { logger } from "../utils/logger";
-
-// Base uploads directory (relative to backend root)
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 // Bucket configurations (same keys as Supabase for compatibility)
 export const BUCKETS = {
@@ -17,7 +15,7 @@ export const BUCKETS = {
 export type BucketName = keyof typeof BUCKETS;
 
 function getBaseUrl(): string {
-  return process.env.API_URL || "http://localhost:" + (process.env.PORT || "3000");
+  return process.env.API_URL || "http://localhost:" + (process.env.PORT || "4015");
 }
 
 /**
@@ -42,7 +40,7 @@ export class LocalUploadService {
     const filename = `${timestamp}-${randomSuffix}.${ext}`;
 
     const relativePath = folder ? `${bucket}/${folder}/${filename}` : `${bucket}/${filename}`;
-    const absolutePath = path.join(UPLOADS_DIR, relativePath);
+    const absolutePath = path.join(getUploadsDir(), relativePath);
 
     await ensureDir(path.dirname(absolutePath));
     await fs.writeFile(absolutePath, file.buffer);
@@ -64,7 +62,7 @@ export class LocalUploadService {
     _contentType: string = "image/png"
   ): Promise<{ url: string; path: string }> {
     const relativePath = folder ? `${bucket}/${folder}/${filename}` : `${bucket}/${filename}`;
-    const absolutePath = path.join(UPLOADS_DIR, relativePath);
+    const absolutePath = path.join(getUploadsDir(), relativePath);
 
     await ensureDir(path.dirname(absolutePath));
     await fs.writeFile(absolutePath, buffer);
@@ -81,7 +79,7 @@ export class LocalUploadService {
   static async deleteFile(bucket: string, filePath: string): Promise<void> {
     // filePath can be "bucket/sub/filename" or "filename" (legacy)
     const relativePath = filePath.includes("/") ? filePath : `${bucket}/${filePath}`;
-    const absolutePath = path.join(UPLOADS_DIR, relativePath);
+    const absolutePath = path.join(getUploadsDir(), relativePath);
 
     try {
       await fs.access(absolutePath);
@@ -102,7 +100,7 @@ export class LocalUploadService {
    * Ensure bucket directory exists (no-op for local)
    */
   static async createBucket(bucket: string): Promise<void> {
-    const bucketPath = path.join(UPLOADS_DIR, bucket);
+    const bucketPath = path.join(getUploadsDir(), bucket);
     await ensureDir(bucketPath);
     logger.info(`Bucket directory ready: ${bucket}`);
   }
@@ -111,7 +109,7 @@ export class LocalUploadService {
    * Check if bucket directory exists
    */
   static async bucketExists(bucket: string): Promise<boolean> {
-    const bucketPath = path.join(UPLOADS_DIR, bucket);
+    const bucketPath = path.join(getUploadsDir(), bucket);
     try {
       const stat = await fs.stat(bucketPath);
       return stat.isDirectory();

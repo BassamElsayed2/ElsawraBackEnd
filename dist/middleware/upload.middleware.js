@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.uploadMultiple = exports.uploadSingle = exports.upload = void 0;
 const multer_1 = __importDefault(require("multer"));
-// Configure memory storage for Supabase uploads
+// Memory storage; files are written to disk by LocalUploadService
 const storage = multer_1.default.memoryStorage();
 // File filter - only allow images
 const fileFilter = (req, file, cb) => {

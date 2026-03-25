@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import fs from "fs";
 import path from "path";
+import { getUploadsDir } from "../config/uploads";
 import { ApiError } from "../middleware/error.middleware";
 
 export class UploadService {
@@ -74,25 +75,16 @@ export class UploadService {
     }
   }
 
-  // Get file URL
+  // Get file URL for paths under the configured uploads directory
   static getFileUrl(filePath: string): string {
-    const uploadsDir = process.env.UPLOAD_DIR || "./uploads";
-    const apiUrl = process.env.API_URL;
-
-    // Convert backslashes to forward slashes
-    let relativePath = filePath.replace(/\\/g, "/");
-
-    // Remove all possible uploads directory prefixes
-    relativePath = relativePath
-      .replace("./uploads/", "")
-      .replace("./uploads", "")
-      .replace("uploads/", "")
-      .replace("uploads", "");
-
-    // Remove leading slashes
-    relativePath = relativePath.replace(/^\/+/, "");
-
-    // Return URL with single /uploads/ prefix
-    return `${apiUrl}/uploads/${relativePath}`;
+    const apiUrl = process.env.API_URL || "";
+    const uploadsDir = getUploadsDir();
+    const normalized = path.resolve(filePath);
+    let rel = path.relative(uploadsDir, normalized).replace(/\\/g, "/");
+    if (rel.startsWith("..")) {
+      const m = normalized.replace(/\\/g, "/").match(/\/uploads\/(.+)$/i);
+      rel = m ? m[1] : path.basename(normalized);
+    }
+    return `${apiUrl}/uploads/${rel.replace(/^\/+/, "")}`;
   }
 }
