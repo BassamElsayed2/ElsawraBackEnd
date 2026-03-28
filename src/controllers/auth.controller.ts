@@ -2,6 +2,10 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../types";
 import { AuthService } from "../services/auth.service";
 import { asyncHandler } from "../middleware/error.middleware";
+import {
+  getSessionCookieOptions,
+  getClearSessionCookieOptions,
+} from "../config/auth";
 
 export class AuthController {
   // Sign up
@@ -29,13 +33,7 @@ export class AuthController {
       );
       const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
 
-      // Set httpOnly cookie
-      res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie(cookieName, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -57,9 +55,9 @@ export class AuthController {
         await AuthService.signOut(req.user.id, token, req);
       }
 
-      // Clear both cookies (in case both exist)
-      res.clearCookie("food_cms_session");
-      res.clearCookie("dashboard_session");
+      const clearOpts = getClearSessionCookieOptions();
+      res.clearCookie("food_cms_session", clearOpts);
+      res.clearCookie("dashboard_session", clearOpts);
 
       res.json({
         success: true,
@@ -124,8 +122,7 @@ export class AuthController {
         req
       );
 
-      // Clear all cookies
-      res.clearCookie("food_cms_session");
+      res.clearCookie("food_cms_session", getClearSessionCookieOptions());
 
       res.json({
         success: true,
@@ -167,13 +164,7 @@ export class AuthController {
       );
       const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
 
-      // Set httpOnly cookie
-      res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie(cookieName, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -208,13 +199,7 @@ export class AuthController {
       );
       const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
 
-      // Set httpOnly cookie
-      res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      res.cookie(cookieName, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,

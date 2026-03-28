@@ -18,9 +18,20 @@ const app = (0, express_1.default)();
 const PORT = Number(process.env.PORT) || 4015;
 // Security middleware
 app.use((0, helmet_1.default)());
+// CORS: allow main app URLs + optional extra origins (preview deploys, www vs non-www)
+function getCorsOrigin() {
+    const fromEnv = [
+        process.env.FRONTEND_URL,
+        process.env.DASHBOARD_URL,
+        ...(process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ||
+            []),
+    ].filter((x) => !!x);
+    const unique = [...new Set(fromEnv)];
+    return unique.length ? unique : true;
+}
 // CORS configuration
 app.use((0, cors_1.default)({
-    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
+    origin: getCorsOrigin(),
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],

@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
 const auth_service_1 = require("../services/auth.service");
 const error_middleware_1 = require("../middleware/error.middleware");
+const auth_1 = require("../config/auth");
 class AuthController {
 }
 exports.AuthController = AuthController;
@@ -24,13 +25,7 @@ AuthController.signIn = (0, error_middleware_1.asyncHandler)(async (req, res, ne
     // Admins use dashboard_session, regular users use food_cms_session
     const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
     const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    // Set httpOnly cookie
-    res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: "Logged in successfully",
@@ -45,9 +40,9 @@ AuthController.signOut = (0, error_middleware_1.asyncHandler)(async (req, res, n
     if (req.user && token) {
         await auth_service_1.AuthService.signOut(req.user.id, token, req);
     }
-    // Clear both cookies (in case both exist)
-    res.clearCookie("food_cms_session");
-    res.clearCookie("dashboard_session");
+    const clearOpts = (0, auth_1.getClearSessionCookieOptions)();
+    res.clearCookie("food_cms_session", clearOpts);
+    res.clearCookie("dashboard_session", clearOpts);
     res.json({
         success: true,
         message: "Logged out successfully",
@@ -91,8 +86,7 @@ AuthController.changePassword = (0, error_middleware_1.asyncHandler)(async (req,
     }
     const { old_password, new_password } = req.body;
     await auth_service_1.AuthService.changePassword(req.user.id, old_password, new_password, req);
-    // Clear all cookies
-    res.clearCookie("food_cms_session");
+    res.clearCookie("food_cms_session", (0, auth_1.getClearSessionCookieOptions)());
     res.json({
         success: true,
         message: "Password changed successfully. Please login again.",
@@ -120,13 +114,7 @@ AuthController.googleSignIn = (0, error_middleware_1.asyncHandler)(async (req, r
     // Determine cookie name based on user role
     const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
     const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    // Set httpOnly cookie
-    res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: result.isNewUser
@@ -151,13 +139,7 @@ AuthController.facebookSignIn = (0, error_middleware_1.asyncHandler)(async (req,
     // Determine cookie name based on user role
     const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
     const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    // Set httpOnly cookie
-    res.cookie(cookieName, result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
+    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: result.isNewUser

@@ -1,3 +1,17 @@
+export type SessionCookieOptions = {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: "strict" | "lax" | "none";
+    maxAge: number;
+};
+export declare function getSessionCookieOptions(): SessionCookieOptions;
+/** Pass to res.clearCookie(name, opts) so the browser actually removes SameSite=None cookies */
+export declare function getClearSessionCookieOptions(): {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: "strict" | "lax" | "none";
+    path: string;
+};
 export declare const AUTH_CONFIG: {
     jwt: {
         secret: string;

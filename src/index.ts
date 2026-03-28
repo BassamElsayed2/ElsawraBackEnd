@@ -17,10 +17,22 @@ const PORT = Number(process.env.PORT) || 4015;
 // Security middleware
 app.use(helmet());
 
+// CORS: allow main app URLs + optional extra origins (preview deploys, www vs non-www)
+function getCorsOrigin(): string | string[] | boolean {
+  const fromEnv = [
+    process.env.FRONTEND_URL,
+    process.env.DASHBOARD_URL,
+    ...(process.env.CORS_ORIGINS?.split(",").map((s) => s.trim()).filter(Boolean) ||
+      []),
+  ].filter((x): x is string => !!x);
+  const unique = [...new Set(fromEnv)];
+  return unique.length ? unique : true;
+}
+
 // CORS configuration
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL],
+    origin: getCorsOrigin(),
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
