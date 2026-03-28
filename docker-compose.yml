@@ -9,9 +9,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: "4015"
-      UPLOADS_DIR: /app/uploads
+      UPLOADS_DIR: /uploads
     volumes:
-      - uploads_data:/app/uploads
+      - uploads_data:/uploads
     restart: unless-stopped
 
 volumes:

@@ -198,19 +198,12 @@ class AddressesController {
                     message: "Address not found or unauthorized",
                 });
             }
-            // Check if address is linked to any orders
-            const ordersCheck = await database_1.pool.request().input("addressId", id).query(`
-          SELECT COUNT(*) as order_count 
-          FROM orders 
+            // Unlink past orders so the address row can be removed (historical orders keep other fields)
+            await database_1.pool.request().input("addressId", id).query(`
+          UPDATE orders
+          SET address_id = NULL
           WHERE address_id = @addressId
         `);
-            if (ordersCheck.recordset[0].order_count > 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Cannot delete address. It is linked to existing orders.",
-                    code: "ADDRESS_HAS_ORDERS",
-                });
-            }
             await database_1.pool.request().input("id", id).query(`
           DELETE FROM addresses
           WHERE id = @id
