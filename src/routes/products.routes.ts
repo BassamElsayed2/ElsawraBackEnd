@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { ProductsController } from "../controllers/products.controller";
 import { BranchProductsController } from "../controllers/branch-products.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
   validateQuery,
@@ -41,23 +41,20 @@ router.get(
 // Admin routes
 router.post(
   "/",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateBody(createProductSchema),
   ProductsController.createProduct
 );
 router.put(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(updateProductSchema),
   ProductsController.updateProduct
 );
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   ProductsController.deleteProduct
 );
@@ -69,8 +66,7 @@ router.delete(
 // Get branches for a product
 router.get(
   "/:productId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ productId: z.string().uuid() })),
   BranchProductsController.getProductBranches
 );
@@ -78,8 +74,7 @@ router.get(
 // Update product branches (replace all)
 router.put(
   "/:productId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ productId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.updateProductBranches
@@ -88,8 +83,7 @@ router.put(
 // Add product to branches
 router.post(
   "/:productId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ productId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.addProductToBranches
@@ -98,8 +92,7 @@ router.post(
 // Remove product from branches
 router.delete(
   "/:productId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ productId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.removeProductFromBranches

@@ -10,10 +10,8 @@ yarn.lock
 .env.*.local
 
 # Build output
-
+dist/
 build/
-
-scripts/
 
 # Logs
 logs/
@@ -43,6 +41,7 @@ coverage/
 temp/
 tmp/
 
-# Local uploads (images stored on server)
-.uploads/
+# Local uploads (images stored on server — not committed)
+uploads/*
+!uploads/.gitkeep
 

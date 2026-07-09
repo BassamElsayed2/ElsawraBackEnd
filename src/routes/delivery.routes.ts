@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { DeliveryController } from "../controllers/delivery.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
   validateParams,
@@ -12,7 +12,7 @@ const router = Router();
 // Calculate delivery fee (authenticated users)
 router.post(
   "/calculate-fee",
-  authMiddleware,
+  customerAuthMiddleware,
   validateBody(
     z.object({
       user_latitude: z.number().min(-90).max(90),
@@ -26,15 +26,13 @@ router.post(
 // Admin routes for managing delivery fee configurations
 router.get(
   "/fee-configs",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   DeliveryController.getDeliveryFeeConfigs
 );
 
 router.post(
   "/fee-configs",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateBody(
     z.object({
       min_distance_km: z.number().min(0),
@@ -47,8 +45,7 @@ router.post(
 
 router.put(
   "/fee-configs/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(
     z.object({
@@ -63,8 +60,7 @@ router.put(
 
 router.delete(
   "/fee-configs/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   DeliveryController.deleteDeliveryFeeConfig
 );

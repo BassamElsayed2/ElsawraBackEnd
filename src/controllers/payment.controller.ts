@@ -23,6 +23,7 @@ export class PaymentController {
         customer_name,
         customer_email,
         customer_phone,
+        lang,
       } = req.body;
 
       // Validate required fields
@@ -40,6 +41,7 @@ export class PaymentController {
         customer_name,
         customer_email,
         customer_phone,
+        lang,
       });
 
       res.status(200).json({

@@ -22,51 +22,51 @@ export declare const createProductSchema: z.ZodObject<{
             created_at: z.ZodOptional<z.ZodString>;
         }, "strip", z.ZodTypeAny, {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }, {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }>, "many">;
         created_at: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }, {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }>, "many">;
 }, "strip", z.ZodTypeAny, {
@@ -78,18 +78,18 @@ export declare const createProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }[];
     user_id?: string;
@@ -102,18 +102,18 @@ export declare const createProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }[];
     user_id?: string;
@@ -142,51 +142,51 @@ export declare const updateProductSchema: z.ZodObject<{
             created_at: z.ZodOptional<z.ZodString>;
         }, "strip", z.ZodTypeAny, {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }, {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }>, "many">;
         created_at: z.ZodOptional<z.ZodString>;
     }, "strip", z.ZodTypeAny, {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }, {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }>, "many">>;
 }, "strip", z.ZodTypeAny, {
@@ -198,18 +198,18 @@ export declare const updateProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }[];
     is_active?: boolean;
@@ -223,18 +223,18 @@ export declare const updateProductSchema: z.ZodObject<{
     image_url?: string;
     types?: {
         id?: string;
-        product_id?: string;
-        created_at?: string;
         name_ar?: string;
         name_en?: string;
+        created_at?: string;
+        product_id?: string;
         sizes?: {
             id?: string;
+            created_at?: string;
             price?: number;
             type_id?: string;
             size_ar?: string;
             size_en?: string;
             offer_price?: number;
-            created_at?: string;
         }[];
     }[];
     is_active?: boolean;
@@ -248,15 +248,15 @@ export declare const getProductsQuerySchema: z.ZodObject<{
     search: z.ZodOptional<z.ZodString>;
     is_active: z.ZodOptional<z.ZodEffects<z.ZodEnum<["true", "false"]>, boolean, "true" | "false">>;
 }, "strip", z.ZodTypeAny, {
-    limit?: number;
     search?: string;
+    limit?: number;
     category_id?: string;
     is_active?: boolean;
     page?: number;
     branch_id?: string;
 }, {
-    limit?: string;
     search?: string;
+    limit?: string;
     category_id?: string;
     is_active?: "true" | "false";
     page?: string;

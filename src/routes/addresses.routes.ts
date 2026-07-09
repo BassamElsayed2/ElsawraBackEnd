@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { AddressesController } from "../controllers/addresses.controller";
-import { authMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
   validateParams,
@@ -39,7 +39,7 @@ const updateAddressSchema = z.object({
 });
 
 // All routes require authentication
-router.use(authMiddleware);
+router.use(customerAuthMiddleware);
 
 // Get user addresses
 router.get("/", AddressesController.getUserAddresses);

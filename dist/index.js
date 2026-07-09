@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const http_1 = __importDefault(require("http"));
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const helmet_1 = __importDefault(require("helmet"));
@@ -12,6 +13,7 @@ const error_middleware_1 = require("./middleware/error.middleware");
 const logger_1 = require("./utils/logger");
 const database_1 = require("./config/database");
 const uploads_1 = require("./config/uploads");
+const socket_1 = require("./socket");
 // Load environment variables
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -58,10 +60,10 @@ app.get("/health", async (_req, res) => {
 });
 // Import routes
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
+const dashboard_auth_routes_1 = __importDefault(require("./routes/dashboard-auth.routes"));
 const products_routes_1 = __importDefault(require("./routes/products.routes"));
 const categories_routes_1 = __importDefault(require("./routes/categories.routes"));
 const orders_routes_1 = __importDefault(require("./routes/orders.routes"));
-const offers_routes_1 = __importDefault(require("./routes/offers.routes"));
 const comboOffers_routes_1 = __importDefault(require("./routes/comboOffers.routes"));
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const upload_routes_1 = __importDefault(require("./routes/upload.routes"));
@@ -71,7 +73,6 @@ const feedback_routes_1 = __importDefault(require("./routes/feedback.routes"));
 const addresses_routes_1 = __importDefault(require("./routes/addresses.routes"));
 const delivery_routes_1 = __importDefault(require("./routes/delivery.routes"));
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
-const temp_admin_routes_1 = __importDefault(require("./routes/temp-admin.routes"));
 // Serve uploaded files with CORS
 app.use("/uploads", (req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -82,10 +83,10 @@ app.use("/uploads", (req, res, next) => {
 }, express_1.default.static((0, uploads_1.getUploadsDir)()));
 // API routes
 app.use("/api/auth", auth_routes_1.default);
+app.use("/api/dashboard/auth", dashboard_auth_routes_1.default);
 app.use("/api/products", products_routes_1.default);
 app.use("/api/categories", categories_routes_1.default);
 app.use("/api/orders", orders_routes_1.default);
-app.use("/api/offers", offers_routes_1.default);
 app.use("/api/combo-offers", comboOffers_routes_1.default);
 app.use("/api/admin", admin_routes_1.default);
 app.use("/api/upload", upload_routes_1.default);
@@ -95,7 +96,6 @@ app.use("/api/feedback", feedback_routes_1.default);
 app.use("/api/addresses", addresses_routes_1.default);
 app.use("/api/delivery", delivery_routes_1.default);
 app.use("/api/payments", payment_routes_1.default);
-app.use("/api/temp-admin", temp_admin_routes_1.default);
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({
@@ -108,14 +108,17 @@ app.use((req, res) => {
 app.use(error_middleware_1.errorHandler);
 // Start server (ensure uploads dir exists for empty volumes / first run)
 void (0, uploads_1.ensureUploadsRootExists)().then(() => {
-    const server = app.listen(PORT, "0.0.0.0", () => {
+    const httpServer = http_1.default.createServer(app);
+    (0, socket_1.initSocket)(httpServer, getCorsOrigin());
+    httpServer.listen(PORT, "0.0.0.0", () => {
         logger_1.logger.info(`Server running on 0.0.0.0:${PORT}`);
         logger_1.logger.info(`Environment: ${process.env.NODE_ENV}`);
         logger_1.logger.info(`Uploads directory: ${(0, uploads_1.getUploadsDir)()}`);
         logger_1.logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
+        logger_1.logger.info("WebSocket enabled at /socket.io");
     });
-    process.on("SIGTERM", () => shutdown(server, "SIGTERM signal received"));
-    process.on("SIGINT", () => shutdown(server, "SIGINT signal received"));
+    process.on("SIGTERM", () => shutdown(httpServer, "SIGTERM signal received"));
+    process.on("SIGINT", () => shutdown(httpServer, "SIGINT signal received"));
     function shutdown(s, label) {
         logger_1.logger.info(`${label}: closing HTTP server`);
         s.close(() => {

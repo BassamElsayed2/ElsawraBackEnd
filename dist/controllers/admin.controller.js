@@ -4,176 +4,169 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AdminController = void 0;
 const database_1 = require("../config/database");
 const error_middleware_1 = require("../middleware/error.middleware");
+const admin_users_service_1 = require("../services/admin-users.service");
+const dashboard_stats_service_1 = require("../services/dashboard-stats.service");
+const roles_service_1 = require("../services/roles.service");
+const users_list_service_1 = require("../services/users-list.service");
+const validation_1 = require("../utils/validation");
 class AdminController {
 }
 exports.AdminController = AdminController;
 _a = AdminController;
-// Get admin profile
-AdminController.getAdminProfile = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+AdminController.getAdminProfile = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
     if (!req.user) {
         throw new error_middleware_1.ApiError(401, "Not authenticated");
     }
     const result = await database_1.pool.request().input("userId", req.user.id).query(`
-        SELECT 
-          ap.id, ap.user_id, ap.full_name, ap.role, ap.permissions,
-          ap.image_url, ap.job_title, ap.address, ap.about,
-          ap.created_at as joined_at, ap.updated_at,
-          u.email,
-          p.phone
-        FROM admin_profiles ap
-        LEFT JOIN users u ON ap.user_id = u.id
-        LEFT JOIN profiles p ON ap.user_id = p.user_id
-        WHERE ap.user_id = @userId
+        SELECT
+          id, id as user_id, full_name, role,
+          image_url, job_title, address, about,
+          email, phone,
+          created_at as joined_at, updated_at
+        FROM dashboard_users
+        WHERE id = @userId
       `);
     if (result.recordset.length === 0) {
         throw new error_middleware_1.ApiError(404, "Admin profile not found");
     }
+    const profile = result.recordset[0];
+    const permissions = await roles_service_1.RolesService.getPermissionsForAdminRole(profile.role);
     res.json({
         success: true,
         data: {
-            profile: result.recordset[0],
+            profile: { ...profile, permissions },
         },
     });
 });
-// Update admin profile
-AdminController.updateAdminProfile = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
+AdminController.updateAdminProfile = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
     if (!req.user) {
         throw new error_middleware_1.ApiError(401, "Not authenticated");
     }
     const { full_name, phone, image_url, job_title, address, about } = req.body;
-    // Check if admin profile exists
     const checkResult = await database_1.pool
         .request()
         .input("userId", req.user.id)
-        .query("SELECT id FROM admin_profiles WHERE user_id = @userId");
+        .query("SELECT id FROM dashboard_users WHERE id = @userId");
     if (checkResult.recordset.length === 0) {
         throw new error_middleware_1.ApiError(404, "Admin profile not found");
     }
-    const transaction = database_1.pool.transaction();
-    await transaction.begin();
-    try {
-        // Update admin_profiles
-        const adminUpdates = [];
-        const adminRequest = transaction.request().input("userId", req.user.id);
-        if (full_name !== undefined) {
-            adminUpdates.push("full_name = @full_name");
-            adminRequest.input("full_name", full_name);
-        }
-        if (image_url !== undefined) {
-            adminUpdates.push("image_url = @image_url");
-            adminRequest.input("image_url", image_url);
-        }
-        if (job_title !== undefined) {
-            adminUpdates.push("job_title = @job_title");
-            adminRequest.input("job_title", job_title);
-        }
-        if (address !== undefined) {
-            adminUpdates.push("address = @address");
-            adminRequest.input("address", address);
-        }
-        if (about !== undefined) {
-            adminUpdates.push("about = @about");
-            adminRequest.input("about", about);
-        }
-        if (adminUpdates.length > 0) {
-            adminUpdates.push("updated_at = GETDATE()");
-            await adminRequest.query(`
-            UPDATE admin_profiles
-            SET ${adminUpdates.join(", ")}
-            WHERE user_id = @userId
-          `);
-        }
-        // Update profiles (phone and full_name)
-        const profileUpdates = [];
-        const profileRequest = transaction
-            .request()
-            .input("userId", req.user.id);
-        if (full_name !== undefined) {
-            profileUpdates.push("full_name = @full_name");
-            profileRequest.input("full_name", full_name);
-        }
-        if (phone !== undefined) {
-            profileUpdates.push("phone = @phone, phone_verified = 0");
-            profileRequest.input("phone", phone);
-        }
-        if (profileUpdates.length > 0) {
-            profileUpdates.push("updated_at = GETDATE()");
-            await profileRequest.query(`
-            UPDATE profiles
-            SET ${profileUpdates.join(", ")}
-            WHERE user_id = @userId
-          `);
-        }
-        await transaction.commit();
-        // Get updated profile
-        const updatedResult = await database_1.pool.request().input("userId", req.user.id)
-            .query(`
-          SELECT 
-            ap.id, ap.user_id, ap.full_name, ap.role, ap.permissions,
-            ap.image_url, ap.job_title, ap.address, ap.about,
-            ap.created_at as joined_at, ap.updated_at,
-            u.email,
-            p.phone
-          FROM admin_profiles ap
-          LEFT JOIN users u ON ap.user_id = u.id
-          LEFT JOIN profiles p ON ap.user_id = p.user_id
-          WHERE ap.user_id = @userId
-        `);
-        res.json({
-            success: true,
-            message: "Profile updated successfully",
-            data: {
-                profile: updatedResult.recordset[0],
-            },
-        });
+    const updates = [];
+    const request = database_1.pool.request().input("userId", req.user.id);
+    if (full_name !== undefined) {
+        updates.push("full_name = @full_name");
+        request.input("full_name", full_name);
     }
-    catch (error) {
-        await transaction.rollback();
-        throw error;
+    if (phone !== undefined) {
+        updates.push("phone = @phone");
+        request.input("phone", (0, validation_1.normalizePhone)(phone));
     }
-});
-// Get all admins (super_admin only)
-AdminController.getAllAdmins = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const result = await database_1.pool.request().query(`
-        SELECT 
-          ap.id, ap.user_id, ap.full_name, ap.role, ap.permissions,
-          ap.image_url, ap.job_title, ap.address, ap.about,
-          ap.created_at as joined_at, ap.updated_at,
-          u.email,
-          p.phone
-        FROM admin_profiles ap
-        LEFT JOIN users u ON ap.user_id = u.id
-        LEFT JOIN profiles p ON ap.user_id = p.user_id
-        ORDER BY ap.created_at DESC
+    if (image_url !== undefined) {
+        updates.push("image_url = @image_url");
+        request.input("image_url", image_url);
+    }
+    if (job_title !== undefined) {
+        updates.push("job_title = @job_title");
+        request.input("job_title", job_title);
+    }
+    if (address !== undefined) {
+        updates.push("address = @address");
+        request.input("address", address);
+    }
+    if (about !== undefined) {
+        updates.push("about = @about");
+        request.input("about", about);
+    }
+    if (updates.length === 0) {
+        throw new error_middleware_1.ApiError(400, "No updates provided");
+    }
+    updates.push("updated_at = GETDATE()");
+    await request.query(`
+        UPDATE dashboard_users
+        SET ${updates.join(", ")}
+        WHERE id = @userId
+      `);
+    const updatedResult = await database_1.pool.request().input("userId", req.user.id)
+        .query(`
+        SELECT
+          id, id as user_id, full_name, role,
+          image_url, job_title, address, about,
+          email, phone,
+          created_at as joined_at, updated_at
+        FROM dashboard_users
+        WHERE id = @userId
       `);
     res.json({
         success: true,
+        message: "Profile updated successfully",
         data: {
-            admins: result.recordset,
+            profile: updatedResult.recordset[0],
         },
     });
 });
-// Get all regular users (admin only)
-AdminController.getAllUsers = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const result = await database_1.pool.request().query(`
-        SELECT 
-          p.id, p.user_id, p.full_name, p.phone, p.phone_verified,
-          p.created_at as joined_at, p.updated_at,
-          u.email, u.email_verified,
-          COUNT(CASE WHEN o.status NOT IN ('cancelled', 'pending_payment') THEN 1 END) as orders_count
-        FROM profiles p
-        LEFT JOIN users u ON p.user_id = u.id
-        LEFT JOIN orders o ON p.user_id = o.user_id
-        WHERE p.user_id NOT IN (SELECT user_id FROM admin_profiles)
-        GROUP BY p.id, p.user_id, p.full_name, p.phone, p.phone_verified,
-                 p.created_at, p.updated_at, u.email, u.email_verified
-        ORDER BY p.created_at DESC
-      `);
+AdminController.getAllAdmins = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
+    const { page, limit, search } = req.query;
+    const result = await users_list_service_1.UsersListService.getAdmins({ page, limit, search });
     res.json({
         success: true,
         data: {
-            users: result.recordset,
+            admins: result.items,
+            pagination: {
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+            },
         },
+    });
+});
+AdminController.getAllUsers = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
+    const { page, limit, search } = req.query;
+    const result = await users_list_service_1.UsersListService.getCustomers({ page, limit, search });
+    res.json({
+        success: true,
+        data: {
+            users: result.items,
+            pagination: {
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+                totalPages: result.totalPages,
+            },
+        },
+    });
+});
+AdminController.getUsersTotals = (0, error_middleware_1.asyncHandler)(async (_req, res, _next) => {
+    const totals = await users_list_service_1.UsersListService.getTotals();
+    res.json({
+        success: true,
+        data: totals,
+    });
+});
+AdminController.getDashboardStats = (0, error_middleware_1.asyncHandler)(async (_req, res, _next) => {
+    const stats = await dashboard_stats_service_1.DashboardStatsService.getDashboardStats();
+    res.json({
+        success: true,
+        data: stats,
+    });
+});
+AdminController.checkPhoneForNewAdmin = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
+    const { phone } = req.query;
+    if (!phone || typeof phone !== "string") {
+        throw new error_middleware_1.ApiError(400, "Phone number is required");
+    }
+    const result = await admin_users_service_1.AdminUsersService.checkPhoneAvailable(phone);
+    res.json({
+        success: true,
+        exists: result.exists,
+        message: result.message,
+    });
+});
+AdminController.createAdmin = (0, error_middleware_1.asyncHandler)(async (req, res, _next) => {
+    const user = await admin_users_service_1.AdminUsersService.createAdminUser(req.body);
+    res.status(201).json({
+        success: true,
+        message: "Admin user created successfully",
+        data: { user },
     });
 });
 //# sourceMappingURL=admin.controller.js.map

@@ -45,10 +45,10 @@ const updateStatusSchema = zod_1.z.object({
 // Public routes (no auth required)
 router.post("/submit", (0, validation_middleware_1.validateBody)(submitFeedbackSchema), feedback_controller_1.FeedbackController.submitFeedback);
 // Admin routes
-router.get("/", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateQuery)(feedbackQuerySchema), feedback_controller_1.FeedbackController.getFeedback);
-router.get("/analytics", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateQuery)(analyticsQuerySchema), feedback_controller_1.FeedbackController.getFeedbackAnalytics);
-router.get("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), feedback_controller_1.FeedbackController.getFeedbackById);
-router.delete("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), feedback_controller_1.FeedbackController.deleteFeedback);
-router.patch("/:id/status", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(updateStatusSchema), feedback_controller_1.FeedbackController.updateFeedbackStatus);
+router.get("/", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateQuery)(feedbackQuerySchema), feedback_controller_1.FeedbackController.getFeedback);
+router.get("/analytics", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateQuery)(analyticsQuerySchema), feedback_controller_1.FeedbackController.getFeedbackAnalytics);
+router.get("/:id", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), feedback_controller_1.FeedbackController.getFeedbackById);
+router.delete("/:id", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), feedback_controller_1.FeedbackController.deleteFeedback);
+router.patch("/:id/status", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(updateStatusSchema), feedback_controller_1.FeedbackController.updateFeedbackStatus);
 exports.default = router;
 //# sourceMappingURL=feedback.routes.js.map

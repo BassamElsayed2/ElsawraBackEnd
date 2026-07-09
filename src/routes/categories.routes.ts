@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { CategoriesController } from "../controllers/categories.controller";
 import { BranchProductsController } from "../controllers/branch-products.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
   validateQuery,
@@ -31,23 +31,20 @@ router.get(
 // Admin routes
 router.post(
   "/",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateBody(createCategorySchema),
   CategoriesController.createCategory
 );
 router.put(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(updateCategorySchema),
   CategoriesController.updateCategory
 );
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   CategoriesController.deleteCategory
 );
@@ -59,8 +56,7 @@ router.delete(
 // Get branches for a category
 router.get(
   "/:categoryId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ categoryId: z.string().uuid() })),
   BranchProductsController.getCategoryBranches
 );
@@ -68,8 +64,7 @@ router.get(
 // Update category branches (replace all)
 router.put(
   "/:categoryId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ categoryId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.updateCategoryBranches
@@ -78,8 +73,7 @@ router.put(
 // Add category to branches
 router.post(
   "/:categoryId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ categoryId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.addCategoryToBranches
@@ -88,8 +82,7 @@ router.post(
 // Remove category from branches
 router.delete(
   "/:categoryId/branches",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ categoryId: z.string().uuid() })),
   validateBody(z.object({ branch_ids: z.array(z.string().uuid()) })),
   BranchProductsController.removeCategoryFromBranches

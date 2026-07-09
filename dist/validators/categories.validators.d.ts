@@ -8,20 +8,20 @@ export declare const createCategorySchema: z.ZodObject<{
     display_order: z.ZodOptional<z.ZodNumber>;
     is_active: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
+    name_ar?: string;
+    name_en?: string;
     description_ar?: string;
     description_en?: string;
     image_url?: string;
     is_active?: boolean;
-    name_ar?: string;
-    name_en?: string;
     display_order?: number;
 }, {
+    name_ar?: string;
+    name_en?: string;
     description_ar?: string;
     description_en?: string;
     image_url?: string;
     is_active?: boolean;
-    name_ar?: string;
-    name_en?: string;
     display_order?: number;
 }>;
 export declare const updateCategorySchema: z.ZodObject<{
@@ -33,20 +33,20 @@ export declare const updateCategorySchema: z.ZodObject<{
     display_order: z.ZodOptional<z.ZodNumber>;
     is_active: z.ZodOptional<z.ZodBoolean>;
 }, "strip", z.ZodTypeAny, {
+    name_ar?: string;
+    name_en?: string;
     description_ar?: string;
     description_en?: string;
     image_url?: string;
     is_active?: boolean;
-    name_ar?: string;
-    name_en?: string;
     display_order?: number;
 }, {
+    name_ar?: string;
+    name_en?: string;
     description_ar?: string;
     description_en?: string;
     image_url?: string;
     is_active?: boolean;
-    name_ar?: string;
-    name_en?: string;
     display_order?: number;
 }>;
 export declare const getCategoriesQuerySchema: z.ZodObject<{

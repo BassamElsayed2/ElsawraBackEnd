@@ -26,7 +26,9 @@ export declare class AuthService {
             phone: any;
             email_verified: any;
             phone_verified: any;
-            role: any;
+            role: string;
+            is_admin: boolean;
+            permissions: any[];
         };
         token: string;
     }>;
@@ -52,7 +54,9 @@ export declare class AuthService {
             phone: any;
             email_verified: any;
             phone_verified: any;
-            role: any;
+            role: string;
+            is_admin: boolean;
+            permissions: any[];
         };
         token: string;
         isNewUser: boolean;
@@ -65,7 +69,9 @@ export declare class AuthService {
             phone: any;
             email_verified: any;
             phone_verified: any;
-            role: any;
+            role: string;
+            is_admin: boolean;
+            permissions: any[];
         };
         token: string;
         isNewUser: boolean;

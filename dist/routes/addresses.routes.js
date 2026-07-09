@@ -34,7 +34,7 @@ const updateAddressSchema = zod_1.z.object({
     is_default: zod_1.z.boolean().optional(),
 });
 // All routes require authentication
-router.use(auth_middleware_1.authMiddleware);
+router.use(auth_middleware_1.customerAuthMiddleware);
 // Get user addresses
 router.get("/", addresses_controller_1.AddressesController.getUserAddresses);
 // Create address

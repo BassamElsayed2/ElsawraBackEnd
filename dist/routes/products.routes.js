@@ -16,19 +16,19 @@ router.get("/bestsellers", (0, validation_middleware_1.validateQuery)(zod_1.z.ob
 })), products_controller_1.ProductsController.getBestsellers);
 router.get("/:id", (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), products_controller_1.ProductsController.getProductById);
 // Admin routes
-router.post("/", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateBody)(products_validators_1.createProductSchema), products_controller_1.ProductsController.createProduct);
-router.put("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(products_validators_1.updateProductSchema), products_controller_1.ProductsController.updateProduct);
-router.delete("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), products_controller_1.ProductsController.deleteProduct);
+router.post("/", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateBody)(products_validators_1.createProductSchema), products_controller_1.ProductsController.createProduct);
+router.put("/:id", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(products_validators_1.updateProductSchema), products_controller_1.ProductsController.updateProduct);
+router.delete("/:id", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ id: zod_1.z.string().uuid() })), products_controller_1.ProductsController.deleteProduct);
 // ============================================
 // PRODUCT-BRANCH MANAGEMENT ROUTES
 // ============================================
 // Get branches for a product
-router.get("/:productId/branches", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getProductBranches);
+router.get("/:productId/branches", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getProductBranches);
 // Update product branches (replace all)
-router.put("/:productId/branches", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.updateProductBranches);
+router.put("/:productId/branches", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.updateProductBranches);
 // Add product to branches
-router.post("/:productId/branches", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.addProductToBranches);
+router.post("/:productId/branches", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.addProductToBranches);
 // Remove product from branches
-router.delete("/:productId/branches", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.removeProductFromBranches);
+router.delete("/:productId/branches", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ productId: zod_1.z.string().uuid() })), (0, validation_middleware_1.validateBody)(zod_1.z.object({ branch_ids: zod_1.z.array(zod_1.z.string().uuid()) })), branch_products_controller_1.BranchProductsController.removeProductFromBranches);
 exports.default = router;
 //# sourceMappingURL=products.routes.js.map

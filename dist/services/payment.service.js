@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentService = void 0;
 const database_1 = require("../config/database");
 const error_middleware_1 = require("../middleware/error.middleware");
+const socket_1 = require("../socket");
 const mssql_1 = __importDefault(require("mssql"));
 const crypto_1 = __importDefault(require("crypto"));
 class PaymentService {
@@ -385,6 +386,12 @@ class PaymentService {
             }
             // Note: If paymentStatus is "pending", we don't update the order
             // to keep it in pending_payment state
+            if (paymentStatus === "completed" ||
+                paymentStatus === "failed" ||
+                paymentStatus === "cancelled" ||
+                paymentStatus === "refunded") {
+                (0, socket_1.emitOrderEvent)("updated", { orderId: customData.orderId });
+            }
             return {
                 success: true,
                 paymentId: customData.paymentId,
@@ -455,6 +462,7 @@ class PaymentService {
             updated_at = GETDATE()
           WHERE id = @orderId AND status = 'pending_payment'
         `);
+            (0, socket_1.emitOrderEvent)("updated", { orderId: payment.order_id });
             payment.status = "cancelled";
         }
         return {
@@ -549,6 +557,7 @@ class PaymentService {
             updated_at = GETDATE()
           WHERE id = @orderId
         `);
+            (0, socket_1.emitOrderEvent)("updated", { orderId: payment.order_id });
             console.log("✅ Payment cancelled successfully");
             return {
                 success: true,

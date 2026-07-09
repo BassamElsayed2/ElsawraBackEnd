@@ -1,3 +1,4 @@
+import http from "http";
 import express, { Express, Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import helmet from "helmet";
@@ -7,6 +8,7 @@ import { errorHandler } from "./middleware/error.middleware";
 import { logger } from "./utils/logger";
 import { isDatabaseConnected } from "./config/database";
 import { ensureUploadsRootExists, getUploadsDir } from "./config/uploads";
+import { initSocket } from "./socket";
 
 // Load environment variables
 dotenv.config();
@@ -64,10 +66,10 @@ app.get("/health", async (_req: Request, res: Response) => {
 
 // Import routes
 import authRoutes from "./routes/auth.routes";
+import dashboardAuthRoutes from "./routes/dashboard-auth.routes";
 import productsRoutes from "./routes/products.routes";
 import categoriesRoutes from "./routes/categories.routes";
 import ordersRoutes from "./routes/orders.routes";
-import offersRoutes from "./routes/offers.routes";
 import comboOffersRoutes from "./routes/comboOffers.routes";
 import adminRoutes from "./routes/admin.routes";
 import uploadRoutes from "./routes/upload.routes";
@@ -78,7 +80,6 @@ import feedbackRoutes from "./routes/feedback.routes";
 import addressesRoutes from "./routes/addresses.routes";
 import deliveryRoutes from "./routes/delivery.routes";
 import paymentRoutes from "./routes/payment.routes";
-import tempAdminRoutes from "./routes/temp-admin.routes";
 
 // Serve uploaded files with CORS
 app.use(
@@ -95,10 +96,10 @@ app.use(
 
 // API routes
 app.use("/api/auth", authRoutes);
+app.use("/api/dashboard/auth", dashboardAuthRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/categories", categoriesRoutes);
 app.use("/api/orders", ordersRoutes);
-app.use("/api/offers", offersRoutes);
 app.use("/api/combo-offers", comboOffersRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/upload", uploadRoutes);
@@ -108,7 +109,6 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/addresses", addressesRoutes);
 app.use("/api/delivery", deliveryRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use("/api/temp-admin", tempAdminRoutes);
 
 // 404 handler
 app.use((req: Request, res: Response) => {
@@ -124,17 +124,21 @@ app.use(errorHandler);
 
 // Start server (ensure uploads dir exists for empty volumes / first run)
 void ensureUploadsRootExists().then(() => {
-  const server = app.listen(PORT, "0.0.0.0", () => {
+  const httpServer = http.createServer(app);
+  initSocket(httpServer, getCorsOrigin());
+
+  httpServer.listen(PORT, "0.0.0.0", () => {
     logger.info(`Server running on 0.0.0.0:${PORT}`);
     logger.info(`Environment: ${process.env.NODE_ENV}`);
     logger.info(`Uploads directory: ${getUploadsDir()}`);
     logger.info(`API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
+    logger.info("WebSocket enabled at /socket.io");
   });
 
-  process.on("SIGTERM", () => shutdown(server, "SIGTERM signal received"));
-  process.on("SIGINT", () => shutdown(server, "SIGINT signal received"));
+  process.on("SIGTERM", () => shutdown(httpServer, "SIGTERM signal received"));
+  process.on("SIGINT", () => shutdown(httpServer, "SIGINT signal received"));
 
-  function shutdown(s: typeof server, label: string) {
+  function shutdown(s: typeof httpServer, label: string) {
     logger.info(`${label}: closing HTTP server`);
     s.close(() => {
       logger.info("HTTP server closed");

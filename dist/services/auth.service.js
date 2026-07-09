@@ -105,6 +105,7 @@ class AuthService {
         const userResult = await database_1.pool.request().input("email", email.toLowerCase())
             .query(`
         SELECT u.id, u.email, u.password_hash, u.email_verified,
+               COALESCE(u.is_active, 1) as is_active,
                p.full_name, p.phone, p.phone_verified
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
@@ -127,11 +128,6 @@ class AuthService {
             throw new error_middleware_1.ApiError(401, "Invalid email or password");
         }
         const user = userResult.recordset[0];
-        // Check if user is admin and get role
-        const adminCheck = await database_1.pool
-            .request()
-            .input("userId", user.id)
-            .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
         // Verify password
         const isPasswordValid = await bcryptjs_1.default.compare(password, user.password_hash);
         if (!isPasswordValid) {
@@ -150,18 +146,22 @@ class AuthService {
             });
             throw new error_middleware_1.ApiError(401, "Invalid email or password");
         }
+        if (user.is_active === false || user.is_active === 0) {
+            await (0, security_middleware_1.logSecurityEvent)("LOGIN_FAILED", req, user.id, email, {
+                reason: "Account disabled",
+            });
+            throw new error_middleware_1.ApiError(403, "Account is disabled");
+        }
         // Clear failed attempts
         await database_1.pool
             .request()
             .input("identifier", email.toLowerCase())
             .execute("sp_ClearFailedAttempts");
-        // Determine user role
-        const userRole = adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-        // Generate JWT token
         const token = jsonwebtoken_1.default.sign({
             userId: user.id,
             email: user.email,
-            role: userRole,
+            role: "user",
+            accountType: "customer",
         }, JWT_SECRET);
         // Create session
         const expiresAt = new Date();
@@ -186,7 +186,9 @@ class AuthService {
                 phone: user.phone,
                 email_verified: user.email_verified,
                 phone_verified: user.phone_verified,
-                role: userRole,
+                role: "user",
+                is_admin: false,
+                permissions: [],
             },
             token,
         };
@@ -205,11 +207,9 @@ class AuthService {
     static async getCurrentUser(userId) {
         const result = await database_1.pool.request().input("userId", userId).query(`
         SELECT u.id, u.email, u.email_verified,
-               p.full_name, p.phone, p.phone_verified, p.mfa_enabled,
-               ap.role
+               p.full_name, p.phone, p.phone_verified, p.mfa_enabled
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
-        LEFT JOIN admin_profiles ap ON u.id = ap.user_id
         WHERE u.id = @userId
       `);
         if (result.recordset.length === 0) {
@@ -218,7 +218,9 @@ class AuthService {
         const user = result.recordset[0];
         return {
             ...user,
-            role: user.role || "user",
+            role: "user",
+            is_admin: false,
+            permissions: [],
         };
     }
     // Update profile
@@ -384,17 +386,11 @@ class AuthService {
                 user.email_verified = true;
             }
         }
-        // Check if user is admin
-        const adminCheck = await database_1.pool
-            .request()
-            .input("userId", user.id)
-            .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
-        const userRole = adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-        // Generate JWT token
         const token = jsonwebtoken_1.default.sign({
             userId: user.id,
             email: user.email,
-            role: userRole,
+            role: "user",
+            accountType: "customer",
         }, JWT_SECRET);
         // Create session
         const expiresAt = new Date();
@@ -422,7 +418,9 @@ class AuthService {
                 phone: user.phone,
                 email_verified: user.email_verified,
                 phone_verified: user.phone_verified,
-                role: userRole,
+                role: "user",
+                is_admin: false,
+                permissions: [],
             },
             token,
             isNewUser,
@@ -495,17 +493,11 @@ class AuthService {
                 user.email_verified = true;
             }
         }
-        // Check if user is admin
-        const adminCheck = await database_1.pool
-            .request()
-            .input("userId", user.id)
-            .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
-        const userRole = adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-        // Generate JWT token
         const token = jsonwebtoken_1.default.sign({
             userId: user.id,
             email: user.email,
-            role: userRole,
+            role: "user",
+            accountType: "customer",
         }, JWT_SECRET);
         // Create session
         const expiresAt = new Date();
@@ -533,7 +525,9 @@ class AuthService {
                 phone: user.phone,
                 email_verified: user.email_verified,
                 phone_verified: user.phone_verified,
-                role: userRole,
+                role: "user",
+                is_admin: false,
+                permissions: [],
             },
             token,
             isNewUser,

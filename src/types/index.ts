@@ -1,12 +1,14 @@
 import { Request } from "express";
+import { AdminContext } from "../middleware/auth.middleware";
 
 // Extend Express Request to include user
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role?: "user" | "admin";
+    role?: string;
   };
+  adminContext?: AdminContext;
 }
 
 // Database types

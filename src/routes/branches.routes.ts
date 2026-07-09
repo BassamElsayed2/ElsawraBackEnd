@@ -1,7 +1,7 @@
 import express from "express";
 import { branchesController } from "../controllers/branches.controller";
 import { BranchProductsController } from "../controllers/branch-products.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import { validateParams } from "../middleware/validation.middleware";
 import { z } from "zod";
 
@@ -14,22 +14,19 @@ router.get("/:id", branchesController.getBranchById);
 // Protected routes (admin only)
 router.post(
   "/",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   branchesController.createBranch
 );
 
 router.put(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   branchesController.updateBranch
 );
 
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   branchesController.deleteBranch
 );
 
@@ -40,8 +37,7 @@ router.delete(
 // Get all products in a branch
 router.get(
   "/:branchId/products",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ branchId: z.string().uuid() })),
   BranchProductsController.getBranchProducts
 );
@@ -49,8 +45,7 @@ router.get(
 // Get all categories in a branch
 router.get(
   "/:branchId/categories",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ branchId: z.string().uuid() })),
   BranchProductsController.getBranchCategories
 );

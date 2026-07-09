@@ -2,6 +2,7 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "../types";
 import { OrdersService } from "../services/orders.service";
 import { asyncHandler } from "../middleware/error.middleware";
+import { emitOrderEvent } from "../socket";
 
 export class OrdersController {
   // Get user orders
@@ -65,6 +66,11 @@ export class OrdersController {
 
       const order = await OrdersService.createOrder(req.user.id, req.body);
 
+      emitOrderEvent("created", {
+        orderId: order.id,
+        order,
+      });
+
       res.status(201).json({
         success: true,
         message: "Order created successfully",
@@ -85,6 +91,11 @@ export class OrdersController {
       const { id } = req.params;
       const order = await OrdersService.cancelOrder(id, req.user.id);
 
+      emitOrderEvent("updated", {
+        orderId: id,
+        order,
+      });
+
       res.json({
         success: true,
         message: "Order cancelled successfully",
@@ -100,6 +111,11 @@ export class OrdersController {
       const { status } = req.body;
 
       const order = await OrdersService.updateOrderStatus(id, status);
+
+      emitOrderEvent("updated", {
+        orderId: id,
+        order,
+      });
 
       res.json({
         success: true,
@@ -120,6 +136,11 @@ export class OrdersController {
 
       const { id } = req.params;
       const order = await OrdersService.markOrderAsPaid(id, req.user.id);
+
+      emitOrderEvent("updated", {
+        orderId: id,
+        order,
+      });
 
       res.json({
         success: true,
@@ -153,54 +174,6 @@ export class OrdersController {
       res.json({
         success: true,
         data: result,
-      });
-    }
-  );
-
-  // Debug orders by status
-  static debugOrdersByStatus = asyncHandler(
-    async (req: AuthRequest, res: Response, next: NextFunction) => {
-      const { status } = req.query as any;
-
-      console.log("🔍 Debug Orders by Status:", status);
-
-      const result = await OrdersService.getAllOrders(
-        1,
-        100, // Get more orders for debugging
-        status,
-        undefined
-      );
-
-      console.log("🔍 Debug Result:", {
-        status: status || "all",
-        totalOrders: result.orders.length,
-        total: result.total,
-        orders: result.orders.map((o) => ({
-          id: o.id,
-          status: o.status,
-          payment_status: o.payment_status,
-          payment_method: o.payment_method,
-          total: o.total,
-          created_at: o.created_at,
-        })),
-      });
-
-      res.json({
-        success: true,
-        message: `Debug orders for status: ${status || "all"}`,
-        data: {
-          status: status || "all",
-          totalOrders: result.orders.length,
-          total: result.total,
-          orders: result.orders.map((o) => ({
-            id: o.id,
-            status: o.status,
-            payment_status: o.payment_status,
-            payment_method: o.payment_method,
-            total: o.total,
-            created_at: o.created_at,
-          })),
-        },
       });
     }
   );
@@ -244,6 +217,8 @@ export class OrdersController {
       const { id } = req.params;
 
       const result = await OrdersService.deleteOrder(id);
+
+      emitOrderEvent("deleted", { orderId: id });
 
       res.json({
         success: true,

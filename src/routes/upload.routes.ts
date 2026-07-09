@@ -1,15 +1,14 @@
 import express from "express";
 import { uploadController } from "../controllers/upload.controller";
 import { uploadSingle } from "../middleware/upload.middleware";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
 // Generic image upload (admin only)
 router.post(
   "/image",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   uploadSingle("image"),
   uploadController.uploadImage
 );
@@ -17,8 +16,7 @@ router.post(
 // Delete image (admin only)
 router.delete(
   "/image",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   uploadController.deleteImage
 );
 

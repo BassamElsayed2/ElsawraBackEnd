@@ -8,8 +8,8 @@ const router = (0, express_1.Router)();
 router.get("/", comboOffers_controller_1.ComboOffersController.getAllComboOffers);
 router.get("/:id", comboOffers_controller_1.ComboOffersController.getComboOfferById);
 // Admin routes
-router.post("/", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, comboOffers_controller_1.ComboOffersController.createComboOffer);
-router.put("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, comboOffers_controller_1.ComboOffersController.updateComboOffer);
-router.delete("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, comboOffers_controller_1.ComboOffersController.deleteComboOffer);
+router.post("/", auth_middleware_1.dashboardAuthMiddleware, comboOffers_controller_1.ComboOffersController.createComboOffer);
+router.put("/:id", auth_middleware_1.dashboardAuthMiddleware, comboOffers_controller_1.ComboOffersController.updateComboOffer);
+router.delete("/:id", auth_middleware_1.dashboardAuthMiddleware, comboOffers_controller_1.ComboOffersController.deleteComboOffer);
 exports.default = router;
 //# sourceMappingURL=comboOffers.routes.js.map

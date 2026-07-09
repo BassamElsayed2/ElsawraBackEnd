@@ -1,5 +1,6 @@
 import { pool } from "../config/database";
 import { ApiError } from "../middleware/error.middleware";
+import { emitOrderEvent } from "../socket";
 import sql from "mssql";
 import crypto from "crypto";
 
@@ -10,6 +11,7 @@ export interface InitiatePaymentData {
   customer_name: string;
   customer_email?: string;
   customer_phone?: string;
+  lang?: string;
 }
 
 export interface PaymentCallbackData {
@@ -91,7 +93,8 @@ export class PaymentService {
         `);
 
       // Prepare EasyKash API request
-      const redirectUrl = `${this.FRONTEND_URL}/payment/result?id=${data.order_id}`;
+      const locale = data.lang === "en" ? "en" : "ar";
+      const redirectUrl = `${this.FRONTEND_URL}/${locale}/payment/result?id=${data.order_id}`;
       const callbackUrl = `${this.BACKEND_URL}/api/payments/easykash/callback`;
 
       // Prepare custom data for customerReference
@@ -501,6 +504,15 @@ export class PaymentService {
       // Note: If paymentStatus is "pending", we don't update the order
       // to keep it in pending_payment state
 
+      if (
+        paymentStatus === "completed" ||
+        paymentStatus === "failed" ||
+        paymentStatus === "cancelled" ||
+        paymentStatus === "refunded"
+      ) {
+        emitOrderEvent("updated", { orderId: customData.orderId });
+      }
+
       return {
         success: true,
         paymentId: customData.paymentId,
@@ -582,6 +594,7 @@ export class PaymentService {
           WHERE id = @orderId AND status = 'pending_payment'
         `);
 
+      emitOrderEvent("updated", { orderId: payment.order_id });
       payment.status = "cancelled";
     }
 
@@ -694,6 +707,8 @@ export class PaymentService {
             updated_at = GETDATE()
           WHERE id = @orderId
         `);
+
+      emitOrderEvent("updated", { orderId: payment.order_id });
 
       console.log("✅ Payment cancelled successfully");
 

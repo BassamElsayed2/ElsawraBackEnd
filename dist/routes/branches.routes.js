@@ -14,15 +14,15 @@ const router = express_1.default.Router();
 router.get("/", branches_controller_1.branchesController.getAllBranches);
 router.get("/:id", branches_controller_1.branchesController.getBranchById);
 // Protected routes (admin only)
-router.post("/", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, branches_controller_1.branchesController.createBranch);
-router.put("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, branches_controller_1.branchesController.updateBranch);
-router.delete("/:id", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, branches_controller_1.branchesController.deleteBranch);
+router.post("/", auth_middleware_1.dashboardAuthMiddleware, branches_controller_1.branchesController.createBranch);
+router.put("/:id", auth_middleware_1.dashboardAuthMiddleware, branches_controller_1.branchesController.updateBranch);
+router.delete("/:id", auth_middleware_1.dashboardAuthMiddleware, branches_controller_1.branchesController.deleteBranch);
 // ============================================
 // BRANCH-PRODUCTS AND BRANCH-CATEGORIES
 // ============================================
 // Get all products in a branch
-router.get("/:branchId/products", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ branchId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getBranchProducts);
+router.get("/:branchId/products", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ branchId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getBranchProducts);
 // Get all categories in a branch
-router.get("/:branchId/categories", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ branchId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getBranchCategories);
+router.get("/:branchId/categories", auth_middleware_1.dashboardAuthMiddleware, (0, validation_middleware_1.validateParams)(zod_1.z.object({ branchId: zod_1.z.string().uuid() })), branch_products_controller_1.BranchProductsController.getBranchCategories);
 exports.default = router;
 //# sourceMappingURL=branches.routes.js.map

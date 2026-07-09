@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { ComboOffersController } from "../controllers/comboOffers.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 
 const router = Router();
 
@@ -11,20 +11,17 @@ router.get("/:id", ComboOffersController.getComboOfferById);
 // Admin routes
 router.post(
   "/",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   ComboOffersController.createComboOffer
 );
 router.put(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   ComboOffersController.updateComboOffer
 );
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   ComboOffersController.deleteComboOffer
 );
 

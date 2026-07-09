@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { OrdersController } from "../controllers/orders.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateBody,
   validateQuery,
@@ -20,8 +20,7 @@ const router = Router();
 // Admin routes (must come before dynamic :id routes)
 router.get(
   "/stats",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateQuery(getOrderStatsQuerySchema),
   OrdersController.getOrderStats
 );
@@ -29,59 +28,50 @@ router.get(
 // User routes
 router.get(
   "/",
-  authMiddleware,
+  customerAuthMiddleware,
   validateQuery(getOrdersQuerySchema),
   OrdersController.getUserOrders
 );
 router.get(
   "/:id",
-  authMiddleware,
+  customerAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.getOrderById
 );
 router.post(
   "/",
-  authMiddleware,
+  customerAuthMiddleware,
   ordersLimiter,
   validateBody(createOrderSchema),
   OrdersController.createOrder
 );
 router.put(
   "/:id/cancel",
-  authMiddleware,
+  customerAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.cancelOrder
 );
 router.put(
   "/:id/mark-paid",
-  authMiddleware,
+  customerAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.markOrderAsPaid
 );
 router.get(
   "/admin/all",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateQuery(getOrdersQuerySchema),
   OrdersController.getAllOrders
 );
 router.get(
-  "/admin/debug",
-  authMiddleware,
-  adminMiddleware,
-  OrdersController.debugOrdersByStatus
-);
-router.get(
   "/admin/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.getOrderByIdAdmin
 );
 router.put(
   "/:id/status",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(updateOrderStatusSchema),
   OrdersController.updateOrderStatus
@@ -90,8 +80,7 @@ router.put(
 // Delete order (admin only)
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   OrdersController.deleteOrder
 );

@@ -92,6 +92,30 @@ export class AuthService {
 
       await transaction.commit();
 
+      const token = jwt.sign(
+        {
+          userId: user.id,
+          email: user.email,
+          role: "user",
+          accountType: "customer",
+        },
+        JWT_SECRET,
+      ) as string;
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      await pool
+        .request()
+        .input("userId", user.id)
+        .input("token", token)
+        .input("deviceName", req.get("user-agent") || "Unknown")
+        .input("ipAddress", req.ip)
+        .input("expiresAt", expiresAt).query(`
+        INSERT INTO sessions (user_id, token, device_name, ip_address, is_current, expires_at)
+        VALUES (@userId, @token, @deviceName, @ipAddress, 1, @expiresAt)
+      `);
+
       // Log success
       await logSecurityEvent("SIGNUP_SUCCESS", req, user.id, email);
 
@@ -101,7 +125,13 @@ export class AuthService {
           email: user.email,
           full_name,
           phone: normalizedPhone,
+          email_verified: false,
+          phone_verified: false,
+          role: "user",
+          is_admin: false,
+          permissions: [],
         },
+        token,
       };
     } catch (error) {
       await transaction.rollback();
@@ -126,8 +156,8 @@ export class AuthService {
       throw new ApiError(
         423,
         `Account temporarily locked. Try again after ${new Date(
-          lockoutCheck.output.locked_until
-        ).toLocaleString()}`
+          lockoutCheck.output.locked_until,
+        ).toLocaleString()}`,
       );
     }
 
@@ -135,6 +165,7 @@ export class AuthService {
     const userResult = await pool.request().input("email", email.toLowerCase())
       .query(`
         SELECT u.id, u.email, u.password_hash, u.email_verified,
+               COALESCE(u.is_active, 1) as is_active,
                p.full_name, p.phone, p.phone_verified
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
@@ -162,12 +193,6 @@ export class AuthService {
 
     const user = userResult.recordset[0];
 
-    // Check if user is admin and get role
-    const adminCheck = await pool
-      .request()
-      .input("userId", user.id)
-      .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
-
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
@@ -190,24 +215,27 @@ export class AuthService {
       throw new ApiError(401, "Invalid email or password");
     }
 
+    if (user.is_active === false || user.is_active === 0) {
+      await logSecurityEvent("LOGIN_FAILED", req, user.id, email, {
+        reason: "Account disabled",
+      });
+      throw new ApiError(403, "Account is disabled");
+    }
+
     // Clear failed attempts
     await pool
       .request()
       .input("identifier", email.toLowerCase())
       .execute("sp_ClearFailedAttempts");
 
-    // Determine user role
-    const userRole =
-      adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
-        role: userRole,
+        role: "user",
+        accountType: "customer",
       },
-      JWT_SECRET
+      JWT_SECRET,
     ) as string;
 
     // Create session
@@ -236,7 +264,9 @@ export class AuthService {
         phone: user.phone,
         email_verified: user.email_verified,
         phone_verified: user.phone_verified,
-        role: userRole,
+        role: "user",
+        is_admin: false,
+        permissions: [],
       },
       token,
     };
@@ -259,11 +289,9 @@ export class AuthService {
   static async getCurrentUser(userId: string) {
     const result = await pool.request().input("userId", userId).query(`
         SELECT u.id, u.email, u.email_verified,
-               p.full_name, p.phone, p.phone_verified, p.mfa_enabled,
-               ap.role
+               p.full_name, p.phone, p.phone_verified, p.mfa_enabled
         FROM users u
         LEFT JOIN profiles p ON u.id = p.user_id
-        LEFT JOIN admin_profiles ap ON u.id = ap.user_id
         WHERE u.id = @userId
       `);
 
@@ -275,14 +303,16 @@ export class AuthService {
 
     return {
       ...user,
-      role: user.role || "user",
+      role: "user",
+      is_admin: false,
+      permissions: [],
     };
   }
 
   // Update profile
   static async updateProfile(
     userId: string,
-    data: { full_name?: string; phone?: string }
+    data: { full_name?: string; phone?: string },
   ) {
     const updates: string[] = [];
     const request = pool.request().input("userId", userId);
@@ -318,7 +348,7 @@ export class AuthService {
     userId: string,
     oldPassword: string,
     newPassword: string,
-    req: Request
+    req: Request,
   ) {
     // Validate new password
     const passwordValidation = validatePassword(newPassword);
@@ -467,7 +497,7 @@ export class AuthService {
           googleUser.email,
           {
             method: "google",
-          }
+          },
         );
       } catch (error) {
         await transaction.rollback();
@@ -487,23 +517,14 @@ export class AuthService {
       }
     }
 
-    // Check if user is admin
-    const adminCheck = await pool
-      .request()
-      .input("userId", user.id)
-      .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
-
-    const userRole =
-      adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
-        role: userRole,
+        role: "user",
+        accountType: "customer",
       },
-      JWT_SECRET
+      JWT_SECRET,
     ) as string;
 
     // Create session
@@ -535,7 +556,9 @@ export class AuthService {
         phone: user.phone,
         email_verified: user.email_verified,
         phone_verified: user.phone_verified,
-        role: userRole,
+        role: "user",
+        is_admin: false,
+        permissions: [],
       },
       token,
       isNewUser,
@@ -545,9 +568,8 @@ export class AuthService {
   // Facebook Sign In
   static async facebookSignIn(accessToken: string, req: Request) {
     // Verify Facebook token and get user info
-    const facebookUser = await FacebookAuthService.verifyAccessToken(
-      accessToken
-    );
+    const facebookUser =
+      await FacebookAuthService.verifyAccessToken(accessToken);
 
     // Check if user exists
     const userResult = await pool
@@ -606,7 +628,7 @@ export class AuthService {
           facebookUser.email,
           {
             method: "facebook",
-          }
+          },
         );
       } catch (error) {
         await transaction.rollback();
@@ -626,23 +648,14 @@ export class AuthService {
       }
     }
 
-    // Check if user is admin
-    const adminCheck = await pool
-      .request()
-      .input("userId", user.id)
-      .query("SELECT id, role FROM admin_profiles WHERE user_id = @userId");
-
-    const userRole =
-      adminCheck.recordset.length > 0 ? adminCheck.recordset[0].role : "user";
-
-    // Generate JWT token
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
-        role: userRole,
+        role: "user",
+        accountType: "customer",
       },
-      JWT_SECRET
+      JWT_SECRET,
     ) as string;
 
     // Create session
@@ -674,7 +687,9 @@ export class AuthService {
         phone: user.phone,
         email_verified: user.email_verified,
         phone_verified: user.phone_verified,
-        role: userRole,
+        role: "user",
+        is_admin: false,
+        permissions: [],
       },
       token,
       isNewUser,

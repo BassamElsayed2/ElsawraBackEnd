@@ -4,6 +4,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.OrdersController = void 0;
 const orders_service_1 = require("../services/orders.service");
 const error_middleware_1 = require("../middleware/error.middleware");
+const socket_1 = require("../socket");
 class OrdersController {
 }
 exports.OrdersController = OrdersController;
@@ -50,6 +51,10 @@ OrdersController.createOrder = (0, error_middleware_1.asyncHandler)(async (req, 
         });
     }
     const order = await orders_service_1.OrdersService.createOrder(req.user.id, req.body);
+    (0, socket_1.emitOrderEvent)("created", {
+        orderId: order.id,
+        order,
+    });
     res.status(201).json({
         success: true,
         message: "Order created successfully",
@@ -65,6 +70,10 @@ OrdersController.cancelOrder = (0, error_middleware_1.asyncHandler)(async (req, 
     }
     const { id } = req.params;
     const order = await orders_service_1.OrdersService.cancelOrder(id, req.user.id);
+    (0, socket_1.emitOrderEvent)("updated", {
+        orderId: id,
+        order,
+    });
     res.json({
         success: true,
         message: "Order cancelled successfully",
@@ -76,6 +85,10 @@ OrdersController.updateOrderStatus = (0, error_middleware_1.asyncHandler)(async 
     const { id } = req.params;
     const { status } = req.body;
     const order = await orders_service_1.OrdersService.updateOrderStatus(id, status);
+    (0, socket_1.emitOrderEvent)("updated", {
+        orderId: id,
+        order,
+    });
     res.json({
         success: true,
         message: "Order status updated successfully",
@@ -91,6 +104,10 @@ OrdersController.markOrderAsPaid = (0, error_middleware_1.asyncHandler)(async (r
     }
     const { id } = req.params;
     const order = await orders_service_1.OrdersService.markOrderAsPaid(id, req.user.id);
+    (0, socket_1.emitOrderEvent)("updated", {
+        orderId: id,
+        order,
+    });
     res.json({
         success: true,
         message: "Order marked as paid successfully",
@@ -111,43 +128,6 @@ OrdersController.getAllOrders = (0, error_middleware_1.asyncHandler)(async (req,
     res.json({
         success: true,
         data: result,
-    });
-});
-// Debug orders by status
-OrdersController.debugOrdersByStatus = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const { status } = req.query;
-    console.log("🔍 Debug Orders by Status:", status);
-    const result = await orders_service_1.OrdersService.getAllOrders(1, 100, // Get more orders for debugging
-    status, undefined);
-    console.log("🔍 Debug Result:", {
-        status: status || "all",
-        totalOrders: result.orders.length,
-        total: result.total,
-        orders: result.orders.map((o) => ({
-            id: o.id,
-            status: o.status,
-            payment_status: o.payment_status,
-            payment_method: o.payment_method,
-            total: o.total,
-            created_at: o.created_at,
-        })),
-    });
-    res.json({
-        success: true,
-        message: `Debug orders for status: ${status || "all"}`,
-        data: {
-            status: status || "all",
-            totalOrders: result.orders.length,
-            total: result.total,
-            orders: result.orders.map((o) => ({
-                id: o.id,
-                status: o.status,
-                payment_status: o.payment_status,
-                payment_method: o.payment_method,
-                total: o.total,
-                created_at: o.created_at,
-            })),
-        },
     });
 });
 // Get order by ID (admin - no user restriction)
@@ -177,6 +157,7 @@ OrdersController.getOrderStats = (0, error_middleware_1.asyncHandler)(async (req
 OrdersController.deleteOrder = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
     const { id } = req.params;
     const result = await orders_service_1.OrdersService.deleteOrder(id);
+    (0, socket_1.emitOrderEvent)("deleted", { orderId: id });
     res.json({
         success: true,
         data: result,

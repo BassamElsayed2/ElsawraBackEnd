@@ -13,12 +13,16 @@ export class AuthController {
     async (req: AuthRequest, res: Response, next: NextFunction) => {
       const result = await AuthService.signUp(req.body, req);
 
+      res.cookie("food_cms_session", result.token, getSessionCookieOptions());
+
       res.status(201).json({
         success: true,
         message: "Account created successfully",
-        data: result,
+        data: {
+          user: result.user,
+        },
       });
-    }
+    },
   );
 
   // Sign in
@@ -26,14 +30,7 @@ export class AuthController {
     async (req: AuthRequest, res: Response, next: NextFunction) => {
       const result = await AuthService.signIn(req.body, req);
 
-      // Determine cookie name based on user role
-      // Admins use dashboard_session, regular users use food_cms_session
-      const isAdmin = ["admin", "super_admin", "manager"].includes(
-        result.user.role || ""
-      );
-      const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-
-      res.cookie(cookieName, result.token, getSessionCookieOptions());
+      res.cookie("food_cms_session", result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -42,14 +39,13 @@ export class AuthController {
           user: result.user,
         },
       });
-    }
+    },
   );
 
   // Sign out
   static signOut = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {
-      const token =
-        req.cookies["dashboard_session"] || req.cookies["food_cms_session"];
+      const token = req.cookies["food_cms_session"];
 
       if (req.user && token) {
         await AuthService.signOut(req.user.id, token, req);
@@ -57,13 +53,12 @@ export class AuthController {
 
       const clearOpts = getClearSessionCookieOptions();
       res.clearCookie("food_cms_session", clearOpts);
-      res.clearCookie("dashboard_session", clearOpts);
 
       res.json({
         success: true,
         message: "Logged out successfully",
       });
-    }
+    },
   );
 
   // Get current user (me)
@@ -82,7 +77,7 @@ export class AuthController {
         success: true,
         data: { user },
       });
-    }
+    },
   );
 
   // Update profile
@@ -101,7 +96,7 @@ export class AuthController {
         success: true,
         message: "Profile updated successfully",
       });
-    }
+    },
   );
 
   // Change password
@@ -119,7 +114,7 @@ export class AuthController {
         req.user.id,
         old_password,
         new_password,
-        req
+        req,
       );
 
       res.clearCookie("food_cms_session", getClearSessionCookieOptions());
@@ -128,7 +123,7 @@ export class AuthController {
         success: true,
         message: "Password changed successfully. Please login again.",
       });
-    }
+    },
   );
 
   // Check if phone exists
@@ -141,7 +136,7 @@ export class AuthController {
         success: true,
         data: { exists },
       });
-    }
+    },
   );
 
   // Google Sign In
@@ -158,13 +153,7 @@ export class AuthController {
 
       const result = await AuthService.googleSignIn(idToken, req);
 
-      // Determine cookie name based on user role
-      const isAdmin = ["admin", "super_admin", "manager"].includes(
-        result.user.role || ""
-      );
-      const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-
-      res.cookie(cookieName, result.token, getSessionCookieOptions());
+      res.cookie("food_cms_session", result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -176,7 +165,7 @@ export class AuthController {
           isNewUser: result.isNewUser,
         },
       });
-    }
+    },
   );
 
   // Facebook Sign In
@@ -193,13 +182,7 @@ export class AuthController {
 
       const result = await AuthService.facebookSignIn(accessToken, req);
 
-      // Determine cookie name based on user role
-      const isAdmin = ["admin", "super_admin", "manager"].includes(
-        result.user.role || ""
-      );
-      const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-
-      res.cookie(cookieName, result.token, getSessionCookieOptions());
+      res.cookie("food_cms_session", result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -211,6 +194,6 @@ export class AuthController {
           isNewUser: result.isNewUser,
         },
       });
-    }
+    },
   );
 }

@@ -300,6 +300,8 @@ export class ProductsService {
 
     products.forEach((product) => {
       product.types = typesMap.get(product.id) || [];
+      const row = rows.find((r) => r.id === product.id);
+      product.order_count = row?.order_count ?? 0;
     });
 
     // Keep same ranking order from bestseller query

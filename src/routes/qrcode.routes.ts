@@ -1,22 +1,20 @@
 import express from "express";
 import { qrcodeController } from "../controllers/qrcode.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
 // Get all QR Codes (admin only) - Must be before /:branchId route
 router.get(
   "/all",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   qrcodeController.getAllQRCodes
 );
 
 // Generate QR Code for a branch (admin only)
 router.post(
   "/generate/:branchId",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   qrcodeController.generateQRCode
 );
 
@@ -26,8 +24,7 @@ router.get("/:branchId", qrcodeController.getQRCode);
 // Delete QR Code (admin only)
 router.delete(
   "/:branchId",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   qrcodeController.deleteQRCode
 );
 

@@ -54,36 +54,6 @@ exports.uploadController = {
             next(error);
         }
     },
-    // Upload branch image (saved to uploads/branches like generic upload)
-    uploadBranchImage: async (req, res, next) => {
-        try {
-            if (!req.file) {
-                res.status(400).json({
-                    success: false,
-                    message: "No file uploaded",
-                });
-                return;
-            }
-            await local_upload_service_1.LocalUploadService.createBucket(local_upload_service_1.BUCKETS.BRANCHES);
-            const { url } = await local_upload_service_1.LocalUploadService.uploadFile(req.file, local_upload_service_1.BUCKETS.BRANCHES, "branches");
-            logger_1.logger.info(`Branch image uploaded: ${req.file.originalname}`);
-            res.status(200).json({
-                success: true,
-                message: "Image uploaded successfully",
-                imageUrl: url,
-                file: {
-                    filename: req.file.originalname,
-                    originalName: req.file.originalname,
-                    size: req.file.size,
-                    mimetype: req.file.mimetype,
-                },
-            });
-        }
-        catch (error) {
-            logger_1.logger.error("Error uploading branch image:", error);
-            next(error);
-        }
-    },
     // Delete uploaded image
     deleteImage: async (req, res, next) => {
         try {

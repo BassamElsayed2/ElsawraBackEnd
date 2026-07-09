@@ -1,6 +1,6 @@
 "use strict";
-// Temporary route لإنشاء Admin user
-// ⚠️ يجب حذف هذا الملف في Production!
+// Temporary admin provisioning routes.
+// TODO(Phase 2): Replace with scripts/create-admin.ts and /api/admin endpoints.
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -12,35 +12,8 @@ const error_middleware_1 = require("../middleware/error.middleware");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const validation_1 = require("../utils/validation");
 const router = (0, express_1.Router)();
-// GET /api/temp-admin/check - للتحقق من وجود admin
-router.get("/check", (0, error_middleware_1.asyncHandler)(async (req, res) => {
-    const { email = "admin@foodcms.com" } = req.query;
-    const result = await database_1.pool.request().input("email", email).query(`
-        SELECT 
-          u.id, 
-          u.email, 
-          p.full_name, 
-          ap.role
-        FROM users u
-        LEFT JOIN profiles p ON u.id = p.user_id
-        LEFT JOIN admin_profiles ap ON u.id = ap.user_id
-        WHERE u.email = @email
-      `);
-    if (result.recordset.length === 0) {
-        return res.json({
-            success: true,
-            exists: false,
-            message: "Admin user not found",
-        });
-    }
-    res.json({
-        success: true,
-        exists: true,
-        data: result.recordset[0],
-    });
-}));
-// GET /api/temp-admin/check-phone - للتحقق من رقم الهاتف
-router.get("/check-phone", (0, error_middleware_1.asyncHandler)(async (req, res) => {
+// GET /api/temp-admin/check-phone - admin-only phone availability check
+router.get("/check-phone", auth_middleware_1.authMiddleware, auth_middleware_1.adminMiddleware, (0, error_middleware_1.asyncHandler)(async (req, res) => {
     const { phone } = req.query;
     if (!phone) {
         return res.status(400).json({
@@ -48,19 +21,7 @@ router.get("/check-phone", (0, error_middleware_1.asyncHandler)(async (req, res)
             message: "Phone number is required",
         });
     }
-    // Normalize phone number
-    let normalizedPhone = phone.replace(/[\s\-()]/g, "");
-    if (!normalizedPhone.startsWith("+")) {
-        if (normalizedPhone.startsWith("20")) {
-            normalizedPhone = "+" + normalizedPhone;
-        }
-        else if (normalizedPhone.startsWith("0")) {
-            normalizedPhone = "+20" + normalizedPhone.slice(1);
-        }
-        else {
-            normalizedPhone = "+20" + normalizedPhone;
-        }
-    }
+    const normalizedPhone = (0, validation_1.normalizePhone)(phone);
     const result = await database_1.pool
         .request()
         .input("phone", normalizedPhone)

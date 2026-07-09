@@ -21,11 +21,7 @@ AuthController.signUp = (0, error_middleware_1.asyncHandler)(async (req, res, ne
 // Sign in
 AuthController.signIn = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
     const result = await auth_service_1.AuthService.signIn(req.body, req);
-    // Determine cookie name based on user role
-    // Admins use dashboard_session, regular users use food_cms_session
-    const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
-    const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
+    res.cookie("food_cms_session", result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: "Logged in successfully",
@@ -36,13 +32,12 @@ AuthController.signIn = (0, error_middleware_1.asyncHandler)(async (req, res, ne
 });
 // Sign out
 AuthController.signOut = (0, error_middleware_1.asyncHandler)(async (req, res, next) => {
-    const token = req.cookies["dashboard_session"] || req.cookies["food_cms_session"];
+    const token = req.cookies["food_cms_session"];
     if (req.user && token) {
         await auth_service_1.AuthService.signOut(req.user.id, token, req);
     }
     const clearOpts = (0, auth_1.getClearSessionCookieOptions)();
     res.clearCookie("food_cms_session", clearOpts);
-    res.clearCookie("dashboard_session", clearOpts);
     res.json({
         success: true,
         message: "Logged out successfully",
@@ -111,10 +106,7 @@ AuthController.googleSignIn = (0, error_middleware_1.asyncHandler)(async (req, r
         });
     }
     const result = await auth_service_1.AuthService.googleSignIn(idToken, req);
-    // Determine cookie name based on user role
-    const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
-    const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
+    res.cookie("food_cms_session", result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: result.isNewUser
@@ -136,10 +128,7 @@ AuthController.facebookSignIn = (0, error_middleware_1.asyncHandler)(async (req,
         });
     }
     const result = await auth_service_1.AuthService.facebookSignIn(accessToken, req);
-    // Determine cookie name based on user role
-    const isAdmin = ["admin", "super_admin", "manager"].includes(result.user.role || "");
-    const cookieName = isAdmin ? "dashboard_session" : "food_cms_session";
-    res.cookie(cookieName, result.token, (0, auth_1.getSessionCookieOptions)());
+    res.cookie("food_cms_session", result.token, (0, auth_1.getSessionCookieOptions)());
     res.json({
         success: true,
         message: result.isNewUser

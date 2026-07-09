@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/auth.controller";
 import { validateBody } from "../middleware/validation.middleware";
-import { authMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware } from "../middleware/auth.middleware";
 import {
   authLimiter,
   passwordResetLimiter,
@@ -21,49 +21,49 @@ router.post(
   "/signup",
   authLimiter,
   validateBody(signUpSchema),
-  AuthController.signUp
+  AuthController.signUp,
 );
 router.post(
   "/signin",
   authLimiter,
   validateBody(signInSchema),
-  AuthController.signIn
+  AuthController.signIn,
 );
 router.post(
   "/google",
   authLimiter,
   validateBody(z.object({ idToken: z.string().min(1) })),
-  AuthController.googleSignIn
+  AuthController.googleSignIn,
 );
 router.post(
   "/facebook",
   authLimiter,
   validateBody(z.object({ accessToken: z.string().min(1) })),
-  AuthController.facebookSignIn
+  AuthController.facebookSignIn,
 );
 
 // Check if phone exists (public)
 router.post(
   "/check-phone",
   validateBody(z.object({ phone: z.string().min(1) })),
-  AuthController.checkPhoneExists
+  AuthController.checkPhoneExists,
 );
 
 // Protected routes
-router.post("/signout", authMiddleware, AuthController.signOut);
-router.get("/me", authMiddleware, AuthController.getMe);
+router.post("/signout", customerAuthMiddleware, AuthController.signOut);
+router.get("/me", customerAuthMiddleware, AuthController.getMe);
 router.put(
   "/profile",
-  authMiddleware,
+  customerAuthMiddleware,
   validateBody(updateProfileSchema),
-  AuthController.updateProfile
+  AuthController.updateProfile,
 );
 router.put(
   "/change-password",
-  authMiddleware,
+  customerAuthMiddleware,
   passwordResetLimiter,
   validateBody(changePasswordSchema),
-  AuthController.changePassword
+  AuthController.changePassword,
 );
 
 export default router;

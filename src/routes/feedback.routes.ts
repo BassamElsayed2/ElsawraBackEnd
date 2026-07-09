@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { FeedbackController } from "../controllers/feedback.controller";
-import { authMiddleware, adminMiddleware } from "../middleware/auth.middleware";
+import { customerAuthMiddleware, dashboardAuthMiddleware } from "../middleware/auth.middleware";
 import {
   validateQuery,
   validateParams,
@@ -60,40 +60,35 @@ router.post(
 // Admin routes
 router.get(
   "/",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateQuery(feedbackQuerySchema),
   FeedbackController.getFeedback
 );
 
 router.get(
   "/analytics",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateQuery(analyticsQuerySchema),
   FeedbackController.getFeedbackAnalytics
 );
 
 router.get(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   FeedbackController.getFeedbackById
 );
 
 router.delete(
   "/:id",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   FeedbackController.deleteFeedback
 );
 
 router.patch(
   "/:id/status",
-  authMiddleware,
-  adminMiddleware,
+  dashboardAuthMiddleware,
   validateParams(z.object({ id: z.string().uuid() })),
   validateBody(updateStatusSchema),
   FeedbackController.updateFeedbackStatus

@@ -1,10 +1,12 @@
 import { Request } from "express";
+import { AdminContext } from "../middleware/auth.middleware";
 export interface AuthRequest extends Request {
     user?: {
         id: string;
         email: string;
-        role?: "user" | "admin";
+        role?: string;
     };
+    adminContext?: AdminContext;
 }
 export interface User {
     id: string;
