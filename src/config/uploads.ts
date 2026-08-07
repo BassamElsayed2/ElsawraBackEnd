@@ -2,9 +2,12 @@ import fs from "fs/promises";
 import path from "path";
 
 /**
- * Absolute path where files are stored on disk (folder served at /uploads).
- * Default: {cwd}/uploads. Set UPLOADS_DIR (or legacy UPLOAD_DIR) to override,
- * e.g. absolute path for a mounted volume.
+ * Disk root for uploaded files (= backend/uploads when the app cwd is backend/).
+ *
+ * Local:   <repo>/backend/uploads/
+ * Docker/Coolify: /app/uploads  (same folder; mount Persistent Storage here)
+ *
+ * Override with UPLOADS_DIR / UPLOAD_DIR only when mounting an external volume.
  */
 export function getUploadsDir(): string {
   const raw = process.env.UPLOADS_DIR || process.env.UPLOAD_DIR;

@@ -15,5 +15,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 RUN mkdir -p /app/uploads
+# Declares the mount point; Coolify must still attach Persistent Storage here
+VOLUME ["/app/uploads"]
 EXPOSE 4015
 CMD ["node", "dist/index.js"]

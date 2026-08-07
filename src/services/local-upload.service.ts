@@ -45,8 +45,11 @@ export class LocalUploadService {
     await ensureDir(path.dirname(absolutePath));
     await fs.writeFile(absolutePath, file.buffer);
 
+    // Public URL saved in DB (e.g. products.image_url); file stays on disk under uploads/
     const url = `${getBaseUrl()}/uploads/${relativePath}`;
-    logger.info(`File uploaded locally: ${relativePath} in bucket: ${bucket}`);
+    logger.info(
+      `File saved on disk: ${absolutePath} | DB url: ${url} | bucket: ${bucket}`
+    );
 
     return { url, path: relativePath };
   }

@@ -51,8 +51,10 @@ export const uploadController = {
         success: true,
         message: "Image uploaded successfully",
         data: {
+          // Full URL → store this in DB (image_url, etc.)
           url: url,
           imageUrl: url,
+          // Relative path under backend/uploads/
           path: path,
           bucket: bucket,
         },

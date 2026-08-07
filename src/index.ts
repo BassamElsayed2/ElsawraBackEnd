@@ -1,4 +1,5 @@
 import http from "http";
+import fs from "fs/promises";
 import express, { Express, Request, Response, NextFunction } from "express";
 import dotenv from "dotenv";
 import helmet from "helmet";
@@ -55,12 +56,31 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   next();
 });
 
-// Health check endpoint
+// Health check endpoint (includes uploads diagnostics for Coolify volume checks)
 app.get("/health", async (_req: Request, res: Response) => {
+  const uploadsDir = getUploadsDir();
+  let uploadsExists = false;
+  let uploadsEntries = 0;
+  try {
+    const stat = await fs.stat(uploadsDir);
+    uploadsExists = stat.isDirectory();
+    if (uploadsExists) {
+      const entries = await fs.readdir(uploadsDir);
+      uploadsEntries = entries.length;
+    }
+  } catch {
+    uploadsExists = false;
+  }
+
   res.status(200).json({
     status: "healthy",
     timestamp: new Date().toISOString(),
     database: isDatabaseConnected() ? "connected" : "disconnected",
+    uploads: {
+      dir: uploadsDir,
+      exists: uploadsExists,
+      topLevelEntries: uploadsEntries,
+    },
   });
 });
 
