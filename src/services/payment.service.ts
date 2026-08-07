@@ -28,7 +28,7 @@ export interface PaymentCallbackData {
   voucher?: string; // Reference number
   easykashRef: string; // Transaction ID
   VoucherData?: string;
-  customerReference?: string; // Our custom data (JSON string)
+  customerReference?: string; // Our payment ID (simple string/number per EasyKash)
   signatureHash?: string; // HMAC signature (optional in some cases)
 }
 
@@ -97,12 +97,9 @@ export class PaymentService {
       const redirectUrl = `${this.FRONTEND_URL}/${locale}/payment/result?id=${data.order_id}`;
       const callbackUrl = `${this.BACKEND_URL}/api/payments/easykash/callback`;
 
-      // Prepare custom data for customerReference
-      const customerReference = JSON.stringify({
-        orderId: data.order_id,
-        paymentId: paymentId,
-        userId: userId,
-      });
+      // EasyKash expects a simple customerReference (number/string), not JSON.
+      // Use paymentId so callbacks can resolve the payment reliably.
+      const customerReference = paymentId;
 
       // EasyKash Direct Payment API request format
       const paymentRequest = {
@@ -114,7 +111,7 @@ export class PaymentService {
         email: data.customer_email || "",
         mobile: data.customer_phone || "",
         redirectUrl: redirectUrl,
-        customerReference: customerReference, // Use the JSON string
+        customerReference,
       };
 
       // Make request to EasyKash API
@@ -331,67 +328,124 @@ export class PaymentService {
       console.log("✅ EasyKash signature verified successfully");
 
       // Extract data from callback
-      const transactionId = data.easykashRef;
+      const easykashRef = data.easykashRef;
+      const productCode = data.ProductCode;
       const status = data.status;
       const amount = parseFloat(data.Amount);
 
       console.log("📊 Callback Data:", {
-        transactionId,
+        easykashRef,
+        productCode,
         status,
         amount,
         paymentMethod: data.PaymentMethod,
         buyerName: data.BuyerName,
         voucher: data.voucher,
+        customerReference: data.customerReference,
       });
 
-      // Parse customerReference to get our custom data
-      let customData: any = {};
+      // Resolve payment: customerReference (paymentId) → ProductCode → easykashRef
+      // Note: we store ProductCode as transaction_id at initiate time (not easykashRef).
+      let customData: {
+        paymentId?: string;
+        orderId?: string;
+        userId?: string;
+      } = {};
+
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       if (data.customerReference) {
-        try {
-          customData = JSON.parse(data.customerReference);
-        } catch (e) {
-          console.error("Failed to parse customerReference:", e);
+        const ref = String(data.customerReference).trim();
+
+        // Preferred: plain paymentId GUID
+        if (uuidRegex.test(ref)) {
+          customData.paymentId = ref;
+        } else {
+          // Backward compat: old JSON customerReference
+          try {
+            const parsed = JSON.parse(ref);
+            if (parsed?.paymentId) {
+              customData = {
+                paymentId: parsed.paymentId,
+                orderId: parsed.orderId,
+                userId: parsed.userId,
+              };
+            }
+          } catch {
+            console.log(
+              "customerReference is not JSON/UUID, will search by ProductCode"
+            );
+          }
         }
       }
 
-      // If no customerReference, try to find payment by transaction ID
-      if (!customData?.paymentId || !customData?.orderId) {
-        console.log(
-          "🔍 No customerReference found, searching by transaction ID:",
-          transactionId
-        );
+      if (!customData.paymentId || !customData.orderId) {
+        const lookupKeys = [productCode, easykashRef, data.customerReference]
+          .filter(Boolean)
+          .map(String);
 
-        // Search for payment by transaction ID
-        const paymentSearchResult = await pool
+        console.log("🔍 Resolving payment by keys:", lookupKeys);
+
+        for (const key of lookupKeys) {
+          const paymentSearchResult = await pool
+            .request()
+            .input("lookupKey", sql.NVarChar(255), key).query(`
+              SELECT TOP 1 p.*, o.status as order_status 
+              FROM payments p
+              LEFT JOIN orders o ON p.order_id = o.id
+              WHERE p.transaction_id = @lookupKey
+                 OR CONVERT(NVARCHAR(36), p.id) = @lookupKey
+            `);
+
+          if (paymentSearchResult.recordset.length > 0) {
+            const found = paymentSearchResult.recordset[0];
+            customData = {
+              paymentId: found.id,
+              orderId: found.order_id,
+              userId: found.user_id,
+            };
+            break;
+          }
+        }
+
+        if (!customData.paymentId || !customData.orderId) {
+          throw new ApiError(404, "Payment not found for transaction ID");
+        }
+      }
+
+      // If we only have paymentId from GUID customerReference, load order_id
+      if (customData.paymentId && !customData.orderId) {
+        const byId = await pool
           .request()
-          .input("transactionId", sql.NVarChar(255), transactionId).query(`
+          .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
+          .query(`
             SELECT p.*, o.status as order_status 
             FROM payments p
             LEFT JOIN orders o ON p.order_id = o.id
-            WHERE p.transaction_id = @transactionId
+            WHERE p.id = @paymentId
           `);
 
-        if (paymentSearchResult.recordset.length === 0) {
-          throw new ApiError(404, "Payment not found for transaction ID");
+        if (byId.recordset.length === 0) {
+          throw new ApiError(404, "Payment not found");
         }
 
-        const payment = paymentSearchResult.recordset[0];
-        customData = {
-          paymentId: payment.id,
-          orderId: payment.order_id,
-          userId: payment.user_id,
-        };
+        customData.orderId = byId.recordset[0].order_id;
+        customData.userId = byId.recordset[0].user_id;
       }
 
       // Get payment record
       const paymentResult = await pool
         .request()
         .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
-        .input("transactionId", sql.NVarChar(255), transactionId).query(`
+        .input("productCode", sql.NVarChar(255), productCode || null)
+        .input("easykashRef", sql.NVarChar(255), easykashRef || null).query(`
           SELECT p.*, o.status as order_status 
           FROM payments p
           LEFT JOIN orders o ON p.order_id = o.id
-          WHERE p.id = @paymentId OR p.transaction_id = @transactionId
+          WHERE p.id = @paymentId
+             OR (@productCode IS NOT NULL AND p.transaction_id = @productCode)
+             OR (@easykashRef IS NOT NULL AND p.transaction_id = @easykashRef)
         `);
 
       if (paymentResult.recordset.length === 0) {
@@ -399,6 +453,8 @@ export class PaymentService {
       }
 
       const payment = paymentResult.recordset[0];
+      customData.paymentId = payment.id;
+      customData.orderId = payment.order_id;
 
       // Map EasyKash status to our status
       let paymentStatus: string;
@@ -447,12 +503,15 @@ export class PaymentService {
           paymentStatus = "pending";
       }
 
+      // Keep ProductCode if we have it; prefer easykashRef as canonical provider ref
+      const storedTransactionId = easykashRef || productCode || payment.transaction_id;
+
       // Update payment record
       await pool
         .request()
         .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
         .input("status", sql.NVarChar(50), paymentStatus)
-        .input("transactionId", sql.NVarChar(255), transactionId)
+        .input("transactionId", sql.NVarChar(255), storedTransactionId)
         .input("referenceNumber", sql.NVarChar(255), data.voucher || null)
         .input("callbackData", sql.NVarChar(sql.MAX), JSON.stringify(data))
         .query(`
