@@ -9,9 +9,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: "4015"
-      UPLOADS_DIR: /uploads
+      UPLOADS_DIR: /app/uploads
     volumes:
-      - uploads_data:/uploads
+      # Survives container rebuild/redeploy (Coolify Persistent Storage / named volume)
+      - uploads_data:/app/uploads
     restart: unless-stopped
 
 volumes:
