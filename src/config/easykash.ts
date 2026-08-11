@@ -8,9 +8,6 @@ export const easykashConfig = {
   hmacSecret: process.env.EASYKASH_HMAC_SECRET,
   callbackUrl: process.env.EASYKASH_CALLBACK_URL,
   enabled: process.env.EASYKASH_ENABLED,
-  /** Local/dev only. Never set true in production deployments. */
-  allowInsecureCallbacks:
-    process.env.PAYMENT_ALLOW_INSECURE_CALLBACKS === "true",
 };
 
 // Validate configuration
@@ -25,15 +22,6 @@ export function validateEasyKashConfig(): boolean {
   );
 
   if (missing.length > 0) {
-    if (
-      missing.includes("hmacSecret") &&
-      easykashConfig.allowInsecureCallbacks
-    ) {
-      console.warn(
-        "⚠️  EasyKash HMAC secret missing but PAYMENT_ALLOW_INSECURE_CALLBACKS=true"
-      );
-      return missing.filter((k) => k !== "hmacSecret").length === 0;
-    }
     console.warn(
       `⚠️  EasyKash configuration incomplete. Missing: ${missing.join(", ")}`
     );
