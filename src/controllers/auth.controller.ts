@@ -139,6 +139,34 @@ export class AuthController {
     },
   );
 
+  // Forgot password — send reset link via Resend
+  static forgotPassword = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { email, lang } = req.body;
+      const result = await AuthService.forgotPassword(email, req, lang);
+
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    },
+  );
+
+  // Reset password with token from email link
+  static resetPassword = asyncHandler(
+    async (req: AuthRequest, res: Response, next: NextFunction) => {
+      const { token, new_password, password } = req.body;
+      const newPassword = new_password || password;
+
+      await AuthService.resetPassword(token, newPassword, req);
+
+      res.json({
+        success: true,
+        message: "Password updated successfully. Please sign in.",
+      });
+    },
+  );
+
   // Google Sign In
   static googleSignIn = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {

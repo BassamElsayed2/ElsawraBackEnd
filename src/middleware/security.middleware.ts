@@ -13,11 +13,11 @@ export async function logSecurityEvent(
   try {
     await pool
       .request()
-      .input("eventType", eventType)
-      .input("userId", userId || null)
+      .input("event_type", eventType)
+      .input("user_id", userId || null)
       .input("email", email || null)
-      .input("ipAddress", req.ip || null)
-      .input("userAgent", req.get("user-agent") || null)
+      .input("ip_address", req.ip || null)
+      .input("user_agent", req.get("user-agent") || null)
       .input("location", null) // Can be populated with IP geolocation
       .input("details", details ? JSON.stringify(details) : null)
       .execute("sp_RecordSecurityEvent");

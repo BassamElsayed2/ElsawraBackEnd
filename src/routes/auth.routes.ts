@@ -11,6 +11,8 @@ import {
   signInSchema,
   updateProfileSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from "../validators/auth.validators";
 import { z } from "zod";
 
@@ -47,6 +49,19 @@ router.post(
   "/check-phone",
   validateBody(z.object({ phone: z.string().min(1) })),
   AuthController.checkPhoneExists,
+);
+
+router.post(
+  "/forgot-password",
+  passwordResetLimiter,
+  validateBody(forgotPasswordSchema),
+  AuthController.forgotPassword,
+);
+router.post(
+  "/reset-password",
+  passwordResetLimiter,
+  validateBody(resetPasswordSchema),
+  AuthController.resetPassword,
 );
 
 // Protected routes

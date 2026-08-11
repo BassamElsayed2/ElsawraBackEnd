@@ -32,12 +32,19 @@ export const changePasswordSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   email: emailSchema,
+  lang: z.enum(["ar", "en"]).optional(),
 });
 
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
-  password: passwordSchema,
-});
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(1, "Reset token is required"),
+    password: passwordSchema.optional(),
+    new_password: passwordSchema.optional(),
+  })
+  .refine((data) => Boolean(data.password || data.new_password), {
+    message: "Password is required",
+    path: ["new_password"],
+  });
 
 export const verifyEmailSchema = z.object({
   token: z.string().min(1, "Verification token is required"),

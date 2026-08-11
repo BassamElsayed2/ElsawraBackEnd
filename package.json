@@ -12,6 +12,7 @@
     "create-admin": "ts-node scripts/create-admin.ts",
     "migrate-rbac": "ts-node scripts/run-rbac-migration.ts",
     "migrate-dashboard-users": "ts-node scripts/run-dashboard-users-migration.ts",
+    "migrate-password-reset": "ts-node scripts/run-password-reset-migration.ts",
     "fix-branches-coords": "ts-node scripts/fix-branches-coordinates.ts"
   },
   "keywords": [
@@ -36,6 +37,7 @@
     "mssql": "^10.0.1",
     "multer": "^1.4.5-lts.1",
     "qrcode": "^1.5.4",
+    "resend": "^6.19.0",
     "socket.io": "^4.8.3",
     "uuid": "^9.0.1",
     "winston": "^3.11.0",

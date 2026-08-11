@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import sql from "mssql";
 import { pool } from "../config/database";
@@ -8,10 +9,20 @@ import { logSecurityEvent } from "../middleware/security.middleware";
 import { Request } from "express";
 import { GoogleAuthService } from "./google-auth.service";
 import { FacebookAuthService } from "./facebook-auth.service";
+import { EmailService } from "./email.service";
+import { logger } from "../utils/logger";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN;
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || "12");
+const PASSWORD_RESET_EXPIRES_MINUTES = parseInt(
+  process.env.PASSWORD_RESET_EXPIRES_MINUTES || "60",
+  10,
+);
+
+function hashResetToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
 
 interface SignUpData {
   email: string;
@@ -420,6 +431,188 @@ export class AuthService {
       .query("DELETE FROM sessions WHERE user_id = @userId");
 
     await logSecurityEvent("PASSWORD_RESET_SUCCESS", req, userId, user.email);
+
+    return { success: true };
+  }
+
+  /**
+   * Request password reset email. Always returns success to avoid email enumeration.
+   */
+  static async forgotPassword(email: string, req: Request, lang?: string) {
+    const normalizedEmail = email.toLowerCase().trim();
+    const genericResponse = {
+      success: true,
+      message:
+        "If an account exists with this email, a password reset link has been sent.",
+    };
+
+    const userResult = await pool
+      .request()
+      .input("email", normalizedEmail)
+      .query(
+        `SELECT id, email, is_active FROM users WHERE email = @email`,
+      );
+
+    if (userResult.recordset.length === 0) {
+      await logSecurityEvent("PASSWORD_RESET_REQUEST", req, undefined, normalizedEmail, {
+        reason: "User not found",
+      });
+      return genericResponse;
+    }
+
+    const user = userResult.recordset[0];
+
+    if (user.is_active === false || user.is_active === 0) {
+      await logSecurityEvent("PASSWORD_RESET_REQUEST", req, user.id, normalizedEmail, {
+        reason: "Account inactive",
+      });
+      return genericResponse;
+    }
+
+    // Invalidate previous unused tokens for this user
+    await pool.request().input("userId", user.id).query(`
+      UPDATE password_reset_tokens
+      SET used_at = GETDATE()
+      WHERE user_id = @userId AND used_at IS NULL
+    `);
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = hashResetToken(rawToken);
+    const expiresAt = new Date(
+      Date.now() + PASSWORD_RESET_EXPIRES_MINUTES * 60 * 1000,
+    );
+
+    await pool
+      .request()
+      .input("userId", user.id)
+      .input("tokenHash", tokenHash)
+      .input("expiresAt", expiresAt).query(`
+        INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+        VALUES (@userId, @tokenHash, @expiresAt)
+      `);
+
+    try {
+      await EmailService.sendPasswordResetEmail(
+        user.email,
+        rawToken,
+        lang || undefined,
+      );
+      await logSecurityEvent("PASSWORD_RESET_REQUEST", req, user.id, user.email, {
+        reason: "Email sent",
+      });
+    } catch (error) {
+      logger.error("Failed to send password reset email:", error);
+      await logSecurityEvent("PASSWORD_RESET_REQUEST", req, user.id, user.email, {
+        reason: "Email send failed",
+      });
+      throw new ApiError(
+        500,
+        "Failed to send password reset email. Please try again later.",
+      );
+    }
+
+    return genericResponse;
+  }
+
+  static async resetPassword(token: string, newPassword: string, req: Request) {
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      throw new ApiError(400, passwordValidation.errors.join(", "));
+    }
+
+    const tokenHash = hashResetToken(token);
+
+    const tokenResult = await pool.request().input("tokenHash", tokenHash)
+      .query(`
+        SELECT t.id, t.user_id, t.expires_at, t.used_at, u.email
+        FROM password_reset_tokens t
+        JOIN users u ON u.id = t.user_id
+        WHERE t.token_hash = @tokenHash
+      `);
+
+    if (tokenResult.recordset.length === 0) {
+      throw new ApiError(400, "Invalid or expired reset link");
+    }
+
+    const resetToken = tokenResult.recordset[0];
+
+    if (resetToken.used_at) {
+      throw new ApiError(400, "This reset link has already been used");
+    }
+
+    if (new Date(resetToken.expires_at) < new Date()) {
+      throw new ApiError(400, "Invalid or expired reset link");
+    }
+
+    const userId = resetToken.user_id as string;
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    // Check password history when procedure exists / user has history
+    try {
+      const historyCheck = await pool
+        .request()
+        .input("userId", userId)
+        .input("passwordHash", newPasswordHash)
+        .input("historyLimit", 5)
+        .output("exists", sql.Bit)
+        .execute("sp_CheckPasswordHistory");
+
+      if (historyCheck.output.exists) {
+        throw new ApiError(400, "Cannot reuse recent passwords");
+      }
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      logger.warn("Password history check skipped:", error);
+    }
+
+    await pool
+      .request()
+      .input("userId", userId)
+      .input("passwordHash", newPasswordHash).query(`
+        UPDATE users
+        SET password_hash = @passwordHash, updated_at = GETDATE()
+        WHERE id = @userId
+      `);
+
+    try {
+      await pool
+        .request()
+        .input("userId", userId)
+        .input("passwordHash", newPasswordHash)
+        .input("maxHistory", 5)
+        .execute("sp_AddPasswordToHistory");
+    } catch (error) {
+      logger.warn("Add password history skipped:", error);
+    }
+
+    await pool.request().input("userId", userId).query(`
+      UPDATE profiles
+      SET last_password_change = GETDATE()
+      WHERE user_id = @userId
+    `);
+
+    // Mark this token used and invalidate any other unused tokens
+    await pool
+      .request()
+      .input("tokenId", resetToken.id)
+      .input("userId", userId).query(`
+        UPDATE password_reset_tokens
+        SET used_at = GETDATE()
+        WHERE id = @tokenId OR (user_id = @userId AND used_at IS NULL)
+      `);
+
+    // Force re-login
+    await pool
+      .request()
+      .input("userId", userId)
+      .query("DELETE FROM sessions WHERE user_id = @userId");
+
+    await logSecurityEvent(
+      "PASSWORD_RESET_SUCCESS",
+      req,
+      userId,
+      resetToken.email,
+    );
 
     return { success: true };
   }
