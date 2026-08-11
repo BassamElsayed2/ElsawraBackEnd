@@ -19,9 +19,100 @@ const PASSWORD_RESET_EXPIRES_MINUTES = parseInt(
   process.env.PASSWORD_RESET_EXPIRES_MINUTES || "60",
   10,
 );
+const PASSWORD_HISTORY_LIMIT = 5;
 
 function hashResetToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+/** Pad unknown-user forgot-password path so latency is closer to the known-user path. */
+async function padForgotPasswordTiming(): Promise<void> {
+  const raw = crypto.randomBytes(32).toString("hex");
+  hashResetToken(raw);
+  await bcrypt.hash(raw.slice(0, 24), Math.min(BCRYPT_ROUNDS, 10));
+}
+
+async function assertPasswordNotReused(
+  userId: string,
+  newPassword: string,
+  currentPasswordHash?: string,
+): Promise<void> {
+  if (currentPasswordHash) {
+    const matchesCurrent = await bcrypt.compare(
+      newPassword,
+      currentPasswordHash,
+    );
+    if (matchesCurrent) {
+      throw new ApiError(400, "Cannot reuse recent passwords");
+    }
+  }
+
+  try {
+    const historyResult = await pool
+      .request()
+      .input("userId", userId)
+      .input("limit", PASSWORD_HISTORY_LIMIT).query(`
+        SELECT TOP (@limit) password_hash
+        FROM password_history
+        WHERE user_id = @userId
+        ORDER BY created_at DESC
+      `);
+
+    for (const row of historyResult.recordset) {
+      if (!row.password_hash) continue;
+      const reused = await bcrypt.compare(newPassword, row.password_hash);
+      if (reused) {
+        throw new ApiError(400, "Cannot reuse recent passwords");
+      }
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    logger.warn("Password history lookup skipped:", error);
+  }
+}
+
+async function addPasswordToHistoryKeepLast5(
+  userId: string,
+  passwordHash: string,
+): Promise<void> {
+  try {
+    await pool
+      .request()
+      .input("userId", userId)
+      .input("passwordHash", passwordHash)
+      .input("maxHistory", PASSWORD_HISTORY_LIMIT)
+      .execute("sp_AddPasswordToHistory");
+  } catch (error) {
+    try {
+      await pool
+        .request()
+        .input("userId", userId)
+        .input("passwordHash", passwordHash).query(`
+          INSERT INTO password_history (user_id, password_hash, created_at)
+          VALUES (@userId, @passwordHash, GETDATE())
+        `);
+    } catch (insertError) {
+      logger.warn("Add password history skipped:", insertError);
+      return;
+    }
+  }
+
+  try {
+    await pool.request().input("userId", userId).input(
+      "keep",
+      PASSWORD_HISTORY_LIMIT,
+    ).query(`
+      ;WITH ranked AS (
+        SELECT id,
+               ROW_NUMBER() OVER (ORDER BY created_at DESC) AS rn
+        FROM password_history
+        WHERE user_id = @userId
+      )
+      DELETE FROM ranked WHERE rn > @keep
+    `);
+  } catch (error) {
+    logger.warn("Password history prune skipped:", error);
+  }
 }
 
 interface SignUpData {
@@ -385,19 +476,9 @@ export class AuthService {
       throw new ApiError(401, "Current password is incorrect");
     }
 
-    // Check password history
-    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-    const historyCheck = await pool
-      .request()
-      .input("userId", userId)
-      .input("passwordHash", newPasswordHash)
-      .input("historyLimit", 5)
-      .output("exists", sql.Bit)
-      .execute("sp_CheckPasswordHistory");
+    await assertPasswordNotReused(userId, newPassword, user.password_hash);
 
-    if (historyCheck.output.exists) {
-      throw new ApiError(400, "Cannot reuse recent passwords");
-    }
+    const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
 
     // Update password
     await pool
@@ -409,13 +490,7 @@ export class AuthService {
         WHERE id = @userId
       `);
 
-    // Add to password history
-    await pool
-      .request()
-      .input("userId", userId)
-      .input("passwordHash", newPasswordHash)
-      .input("maxHistory", 5)
-      .execute("sp_AddPasswordToHistory");
+    await addPasswordToHistoryKeepLast5(userId, newPasswordHash);
 
     // Update profile
     await pool.request().input("userId", userId).query(`
@@ -454,6 +529,7 @@ export class AuthService {
       );
 
     if (userResult.recordset.length === 0) {
+      await padForgotPasswordTiming();
       await logSecurityEvent("PASSWORD_RESET_REQUEST", req, undefined, normalizedEmail, {
         reason: "User not found",
       });
@@ -463,6 +539,7 @@ export class AuthService {
     const user = userResult.recordset[0];
 
     if (user.is_active === false || user.is_active === 0) {
+      await padForgotPasswordTiming();
       await logSecurityEvent("PASSWORD_RESET_REQUEST", req, user.id, normalizedEmail, {
         reason: "Account inactive",
       });
@@ -505,10 +582,8 @@ export class AuthService {
       await logSecurityEvent("PASSWORD_RESET_REQUEST", req, user.id, user.email, {
         reason: "Email send failed",
       });
-      throw new ApiError(
-        500,
-        "Failed to send password reset email. Please try again later.",
-      );
+      // Same generic success to avoid email enumeration via status codes
+      return genericResponse;
     }
 
     return genericResponse;
@@ -524,7 +599,7 @@ export class AuthService {
 
     const tokenResult = await pool.request().input("tokenHash", tokenHash)
       .query(`
-        SELECT t.id, t.user_id, t.expires_at, t.used_at, u.email
+        SELECT t.id, t.user_id, t.expires_at, t.used_at, u.email, u.password_hash
         FROM password_reset_tokens t
         JOIN users u ON u.id = t.user_id
         WHERE t.token_hash = @tokenHash
@@ -545,25 +620,14 @@ export class AuthService {
     }
 
     const userId = resetToken.user_id as string;
+
+    await assertPasswordNotReused(
+      userId,
+      newPassword,
+      resetToken.password_hash,
+    );
+
     const newPasswordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-
-    // Check password history when procedure exists / user has history
-    try {
-      const historyCheck = await pool
-        .request()
-        .input("userId", userId)
-        .input("passwordHash", newPasswordHash)
-        .input("historyLimit", 5)
-        .output("exists", sql.Bit)
-        .execute("sp_CheckPasswordHistory");
-
-      if (historyCheck.output.exists) {
-        throw new ApiError(400, "Cannot reuse recent passwords");
-      }
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      logger.warn("Password history check skipped:", error);
-    }
 
     await pool
       .request()
@@ -574,16 +638,7 @@ export class AuthService {
         WHERE id = @userId
       `);
 
-    try {
-      await pool
-        .request()
-        .input("userId", userId)
-        .input("passwordHash", newPasswordHash)
-        .input("maxHistory", 5)
-        .execute("sp_AddPasswordToHistory");
-    } catch (error) {
-      logger.warn("Add password history skipped:", error);
-    }
+    await addPasswordToHistoryKeepLast5(userId, newPasswordHash);
 
     await pool.request().input("userId", userId).query(`
       UPDATE profiles

@@ -58,15 +58,7 @@ export class PaymentController {
   static handleEasyKashCallback = asyncHandler(
     async (req: AuthRequest, res: Response, next: NextFunction) => {
       const callbackData = req.body;
-
-      // Signature verification is handled in the service layer
-      // EasyKash may send callbacks with or without signatureHash
-      console.log(
-        "📞 Callback received:",
-        JSON.stringify(callbackData, null, 2)
-      );
-
-      const result = await PaymentService.handleCallback(callbackData);
+      const result = await PaymentService.handleCallback(callbackData, req);
 
       res.status(200).json({
         success: true,

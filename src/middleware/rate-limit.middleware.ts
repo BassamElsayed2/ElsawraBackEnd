@@ -72,8 +72,11 @@ export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3,
   keyGenerator: (req: Request) => {
-    // Rate limit by email if available, otherwise by IP
-    return (req.body.email as string) || req.ip || "unknown";
+    const email =
+      typeof req.body?.email === "string"
+        ? req.body.email.toLowerCase().trim()
+        : "";
+    return email || req.ip || "unknown";
   },
   handler: (req: Request, res: Response) => {
     res.status(429).json({

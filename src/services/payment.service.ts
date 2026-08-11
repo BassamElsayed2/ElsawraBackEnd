@@ -1,8 +1,11 @@
 import { pool } from "../config/database";
 import { ApiError } from "../middleware/error.middleware";
 import { emitOrderEvent } from "../socket";
+import { logSecurityEvent } from "../middleware/security.middleware";
+import { logger } from "../utils/logger";
 import sql from "mssql";
 import crypto from "crypto";
+import { Request } from "express";
 
 export interface InitiatePaymentData {
   order_id: string;
@@ -15,22 +18,50 @@ export interface InitiatePaymentData {
 }
 
 export interface PaymentCallbackData {
-  // EasyKash actual callback format
   ProductCode?: string;
   PaymentMethod?: string;
   ProductType?: string;
-  Amount: string; // String from EasyKash
+  Amount: string;
+  Currency?: string;
+  currency?: string;
   BuyerEmail?: string;
   BuyerMobile?: string;
   BuyerName?: string;
   Timestamp?: string;
-  status: string; // PAID, FAILED, etc.
-  voucher?: string; // Reference number
-  easykashRef: string; // Transaction ID
+  status: string;
+  voucher?: string;
+  easykashRef: string;
   VoucherData?: string;
-  customerReference?: string; // Our payment ID (simple string/number per EasyKash)
-  signatureHash?: string; // HMAC signature (optional in some cases)
+  customerReference?: string;
+  merchantReference?: string;
+  signatureHash?: string;
 }
+
+type PaymentVerificationResult =
+  | "ok"
+  | "bad_signature"
+  | "amount_mismatch"
+  | "currency_mismatch"
+  | "ref_mismatch"
+  | "illegal_transition"
+  | "not_found"
+  | "insecure_skipped"
+  | "unknown_status";
+
+const PAYMENT_STATUS_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  pending: new Set(["pending", "completed", "failed", "cancelled"]),
+  completed: new Set(["completed", "refunded"]),
+  failed: new Set(["failed"]),
+  cancelled: new Set(["cancelled"]),
+  refunded: new Set(["refunded"]),
+};
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const HMAC_HEX_REGEX = /^[0-9a-f]+$/i;
+/** SHA-512 hex digest length */
+const HMAC_HEX_LENGTH = 128;
 
 export class PaymentService {
   private static readonly EASYKASH_API_URL = process.env.EASYKASH_API_URL;
@@ -39,19 +70,27 @@ export class PaymentService {
     process.env.EASYKASH_HMAC_SECRET;
   private static readonly FRONTEND_URL =
     process.env.FRONTEND_URL || "http://localhost:3000";
-  private static readonly BACKEND_URL = process.env.API_URL;
+
+  private static allowInsecureCallbacks(): boolean {
+    return process.env.PAYMENT_ALLOW_INSECURE_CALLBACKS === "true";
+  }
 
   /**
    * Initiate payment with EasyKash
    */
   static async initiatePayment(userId: string, data: InitiatePaymentData) {
     try {
-      // Validate API key
       if (!this.EASYKASH_API_KEY) {
         throw new ApiError(500, "EasyKash API key not configured");
       }
 
-      // Verify order exists and belongs to user
+      if (!this.EASYKASH_HMAC_SECRET && !this.allowInsecureCallbacks()) {
+        throw new ApiError(
+          500,
+          "EasyKash HMAC secret not configured. Set EASYKASH_HMAC_SECRET or PAYMENT_ALLOW_INSECURE_CALLBACKS=true for local only.",
+        );
+      }
+
       const orderCheck = await pool
         .request()
         .input("orderId", sql.UniqueIdentifier, data.order_id)
@@ -67,17 +106,14 @@ export class PaymentService {
 
       const order = orderCheck.recordset[0];
 
-      // Check if order is already paid
       if (order.payment_status === "paid") {
         throw new ApiError(400, "Order is already paid");
       }
 
-      // Verify amount matches order total
       if (Math.abs(order.total - data.amount) > 0.01) {
         throw new ApiError(400, "Payment amount does not match order total");
       }
 
-      // Create payment record in database
       const paymentId = crypto.randomUUID();
       await pool
         .request()
@@ -92,21 +128,15 @@ export class PaymentService {
           VALUES (@id, @orderId, @userId, @amount, @currency, @status, @provider, GETDATE())
         `);
 
-      // Prepare EasyKash API request
       const locale = data.lang === "en" ? "en" : "ar";
       const redirectUrl = `${this.FRONTEND_URL}/${locale}/payment/result?id=${data.order_id}`;
-      const callbackUrl = `${this.BACKEND_URL}/api/payments/easykash/callback`;
-
-      // EasyKash expects a simple customerReference (number/string), not JSON.
-      // Use paymentId so callbacks can resolve the payment reliably.
       const customerReference = paymentId;
 
-      // EasyKash Direct Payment API request format
       const paymentRequest = {
         amount: data.amount,
         currency: data.currency || "EGP",
-        paymentOptions: [2, 4], // All payment methods: 2=debit, 3=Card, 4=Wallet, 5=ValU, 6=Kiosk
-        cashExpiry: 3, // hours until cash payment expires
+        paymentOptions: [2, 4],
+        cashExpiry: 3,
         name: data.customer_name,
         email: data.customer_email || "",
         mobile: data.customer_phone || "",
@@ -114,34 +144,30 @@ export class PaymentService {
         customerReference,
       };
 
-      // Make request to EasyKash API
       const response = await fetch(
         `${this.EASYKASH_API_URL}/api/directpayv1/pay`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: this.EASYKASH_API_KEY, // Direct API key without "Bearer"
+            Authorization: this.EASYKASH_API_KEY,
           },
           body: JSON.stringify(paymentRequest),
-        }
+        },
       );
 
       if (!response.ok) {
         const errorData: any = await response.json().catch(() => ({}));
         throw new ApiError(
           response.status,
-          `EasyKash API error: ${errorData.message || response.statusText}`
+          `EasyKash API error: ${errorData.message || response.statusText}`,
         );
       }
 
       const paymentData: any = await response.json();
-
-      // EasyKash returns redirectUrl
       const paymentUrl =
         paymentData.redirectUrl || paymentData.paymentUrl || "";
 
-      // Extract productCode from redirectUrl if available
       let productCode = "";
       if (paymentUrl) {
         const match = paymentUrl.match(/DirectPayV1\/([^\/\?]+)/);
@@ -150,7 +176,6 @@ export class PaymentService {
         }
       }
 
-      // Update payment record with product code
       if (productCode) {
         await pool
           .request()
@@ -169,8 +194,7 @@ export class PaymentService {
         expiresAt: paymentData.expiresAt,
       };
     } catch (error: any) {
-      // Log error for debugging
-      console.error("Payment initiation error:", error);
+      logger.error("Payment initiation error:", error);
 
       if (error instanceof ApiError) {
         throw error;
@@ -180,88 +204,80 @@ export class PaymentService {
   }
 
   /**
-   * Verify HMAC signature from EasyKash callback
-   * According to EasyKash documentation, signature is calculated from specific fields
+   * Verify HMAC signature from EasyKash callback (fail-closed unless insecure flag).
    */
-  static verifyHmacSignature(data: PaymentCallbackData): boolean {
-    // If no signature provided, skip verification (for testing or some callback types)
+  static verifyHmacSignature(data: PaymentCallbackData): {
+    ok: boolean;
+    insecureSkipped?: boolean;
+  } {
+    const insecure = this.allowInsecureCallbacks();
+
     if (!data.signatureHash) {
-      console.log("⚠️ No signature provided, skipping verification");
-      return true; // Allow callback to proceed without signature verification
+      if (insecure) {
+        logger.warn("Payment callback accepted without signature (insecure flag)");
+        return { ok: true, insecureSkipped: true };
+      }
+      return { ok: false };
     }
 
     if (!this.EASYKASH_HMAC_SECRET) {
-      console.log("⚠️ HMAC secret not configured, skipping verification");
-      return true; // Allow callback to proceed without secret
+      if (insecure) {
+        logger.warn("Payment callback accepted without HMAC secret (insecure flag)");
+        return { ok: true, insecureSkipped: true };
+      }
+      return { ok: false };
     }
 
-    // Extract specific fields in exact order as per EasyKash docs
-    const {
-      ProductCode,
-      Amount,
-      ProductType,
-      PaymentMethod,
-      status,
-      easykashRef,
-      customerReference,
-      signatureHash,
-    } = data;
+    const signatureHash = String(data.signatureHash).trim();
+    if (
+      signatureHash.length !== HMAC_HEX_LENGTH ||
+      !HMAC_HEX_REGEX.test(signatureHash)
+    ) {
+      return { ok: false };
+    }
 
-    // Concatenate fields in exact order (no separators)
     const dataToSecure = [
-      ProductCode,
-      Amount,
-      ProductType,
-      PaymentMethod,
-      status,
-      easykashRef,
-      customerReference,
+      data.ProductCode,
+      data.Amount,
+      data.ProductType,
+      data.PaymentMethod,
+      data.status,
+      data.easykashRef,
+      data.customerReference,
     ];
     const dataStr = dataToSecure.join("");
 
-    console.log("🔐 EasyKash Signature Verification:");
-    console.log("Data to secure:", dataStr);
-    console.log("Secret key:", this.EASYKASH_HMAC_SECRET);
-    console.log("Received signature:", signatureHash);
-
-    // Generate HMAC SHA-512 hash
     const calculatedSignature = crypto
       .createHmac("sha512", this.EASYKASH_HMAC_SECRET)
       .update(dataStr)
       .digest("hex");
 
-    console.log("Calculated signature:", calculatedSignature);
-    console.log("Signatures match:", calculatedSignature === signatureHash);
-
-    // Compare signatures
-    return calculatedSignature === signatureHash;
+    try {
+      const a = Buffer.from(calculatedSignature, "utf8");
+      const b = Buffer.from(signatureHash.toLowerCase(), "utf8");
+      if (a.length !== b.length) {
+        return { ok: false };
+      }
+      return { ok: crypto.timingSafeEqual(a, b) };
+    } catch {
+      return { ok: false };
+    }
   }
 
-  /**
-   * Test function to verify EasyKash signature with example data
-   * This matches the example provided in EasyKash documentation
-   */
   static testEasyKashSignature(): boolean {
     const testPayload = {
       ProductCode: "EDV4471",
       Amount: "11.00",
       ProductType: "Direct Pay",
       PaymentMethod: "Cash Through Fawry",
-      BuyerName: "mee",
-      BuyerEmail: "test@mail.com",
-      BuyerMobile: "0123456789",
       status: "PAID",
-      voucher: "",
       easykashRef: "2911105009",
-      VoucherData: "Direct Pay",
       customerReference: "TEST11111",
       signatureHash:
         "0bd9ce502950ffa358314c170dace42e7ba3e0c776f5a32eb15c3d496bc9c294835036dd90d4f287233b800c9bde2f6591b6b8a1f675b6bfe64fd799da29d1d0",
     };
 
     const testSecretKey = "da9fe30575517d987762a859842b5631";
-
-    // Expected concatenated data: EDV447111.00Direct PayCash Through FawryPAID2911105009TEST11111
     const expectedDataStr =
       "EDV447111.00Direct PayCash Through FawryPAID2911105009TEST11111";
 
@@ -270,320 +286,453 @@ export class PaymentService {
       .update(expectedDataStr)
       .digest("hex");
 
-    console.log("🧪 EasyKash Test:");
-    console.log("Expected data string:", expectedDataStr);
-    console.log("Test secret key:", testSecretKey);
-    console.log("Expected signature:", testPayload.signatureHash);
-    console.log("Calculated signature:", calculatedSignature);
-    console.log(
-      "Test result:",
-      calculatedSignature === testPayload.signatureHash
-    );
-
     return calculatedSignature === testPayload.signatureHash;
   }
 
-  /**
-   * Test function for the new EasyKash callback format
-   * Based on the response example provided
-   */
   static testNewEasyKashFormat(): boolean {
-    const newFormatPayload = {
-      PaymentMethod: "Cash Through Fawry",
-      Amount: "10.05",
-      BuyerName: "John Doe",
-      BuyerEmail: "JohnDoe@example.com",
-      BuyerMobile: "01010101010",
-      status: "PAID",
-      voucher: "32423432",
-      easykashRef: "1206102054",
-    };
-
-    console.log("🧪 New EasyKash Format Test:");
-    console.log("Payload:", JSON.stringify(newFormatPayload, null, 2));
-    console.log(
-      "✅ New format test completed - no signature verification needed"
-    );
-
     return true;
+  }
+
+  private static mapEasyKashStatus(status: string): {
+    paymentStatus: string;
+    orderStatus: string | null;
+    known: boolean;
+  } {
+    switch (status.toLowerCase()) {
+      case "success":
+      case "completed":
+      case "paid":
+      case "delivered":
+        return {
+          paymentStatus: "completed",
+          orderStatus: "confirmed",
+          known: true,
+        };
+      case "failed":
+      case "declined":
+        return { paymentStatus: "failed", orderStatus: null, known: true };
+      case "new":
+      case "pending":
+        return { paymentStatus: "pending", orderStatus: null, known: true };
+      case "canceled":
+      case "cancelled":
+      case "expired":
+        return { paymentStatus: "cancelled", orderStatus: null, known: true };
+      case "refunded":
+        return { paymentStatus: "refunded", orderStatus: null, known: true };
+      default:
+        return { paymentStatus: "pending", orderStatus: null, known: false };
+    }
+  }
+
+  private static isTransitionAllowed(
+    currentStatus: string,
+    nextStatus: string,
+  ): boolean {
+    const normalizedCurrent = (currentStatus || "pending").toLowerCase();
+    const allowed = PAYMENT_STATUS_TRANSITIONS[normalizedCurrent];
+    if (!allowed) {
+      return false;
+    }
+    return allowed.has(nextStatus);
+  }
+
+  private static async auditCallback(
+    req: Request | undefined,
+    details: {
+      verification_result: PaymentVerificationResult;
+      received_status?: string;
+      mapped_status?: string;
+      request_id: string;
+      paymentId?: string;
+      orderId?: string;
+    },
+  ): Promise<void> {
+    try {
+      const fakeReq = (req || {
+        ip: undefined,
+        get: () => undefined,
+      }) as Request;
+
+      await logSecurityEvent(
+        "PAYMENT_CALLBACK",
+        fakeReq,
+        undefined,
+        undefined,
+        {
+          verification_result: details.verification_result,
+          ip: req?.ip,
+          received_status: details.received_status,
+          mapped_status: details.mapped_status,
+          request_id: details.request_id,
+          paymentId: details.paymentId,
+          orderId: details.orderId,
+        },
+      );
+    } catch (error) {
+      logger.warn("Payment callback audit failed (best-effort):", error);
+    }
+  }
+
+  private static extractReferencePaymentId(
+    data: PaymentCallbackData,
+  ): string | null {
+    const refs = [data.customerReference, data.merchantReference]
+      .filter(Boolean)
+      .map((r) => String(r).trim());
+
+    for (const ref of refs) {
+      if (UUID_REGEX.test(ref)) {
+        return ref;
+      }
+      try {
+        const parsed = JSON.parse(ref);
+        if (parsed?.paymentId && UUID_REGEX.test(String(parsed.paymentId))) {
+          return String(parsed.paymentId);
+        }
+      } catch {
+        // not JSON
+      }
+    }
+    return null;
   }
 
   /**
    * Handle payment callback from EasyKash
    */
-  static async handleCallback(data: PaymentCallbackData) {
-    try {
-      console.log(
-        "📞 EasyKash Callback Received:",
-        JSON.stringify(data, null, 2)
-      );
+  static async handleCallback(data: PaymentCallbackData, req?: Request) {
+    const requestId = crypto.randomUUID();
+    let paymentId: string | undefined;
+    let orderId: string | undefined;
+    let mappedStatus: string | undefined;
 
-      // Verify HMAC signature using EasyKash's exact format
-      if (!this.verifyHmacSignature(data)) {
-        console.error("❌ Invalid signature in EasyKash callback");
-        console.error("Received data:", JSON.stringify(data, null, 2));
-        throw new ApiError(401, "Invalid signature");
+    const fail = async (
+      verification_result: PaymentVerificationResult,
+      error: ApiError,
+      received_status?: string,
+    ) => {
+      await this.auditCallback(req, {
+        verification_result,
+        received_status: received_status ?? data.status,
+        mapped_status: mappedStatus,
+        request_id: requestId,
+        paymentId,
+        orderId,
+      });
+      throw error;
+    };
+
+    try {
+      const hmac = this.verifyHmacSignature(data);
+      if (!hmac.ok) {
+        await fail(
+          "bad_signature",
+          new ApiError(401, "Invalid signature"),
+        );
       }
 
-      console.log("✅ EasyKash signature verified successfully");
-
-      // Extract data from callback
       const easykashRef = data.easykashRef;
       const productCode = data.ProductCode;
       const status = data.status;
       const amount = parseFloat(data.Amount);
 
-      console.log("📊 Callback Data:", {
-        easykashRef,
-        productCode,
-        status,
-        amount,
-        paymentMethod: data.PaymentMethod,
-        buyerName: data.BuyerName,
-        voucher: data.voucher,
-        customerReference: data.customerReference,
-      });
-
-      // Resolve payment: customerReference (paymentId) → ProductCode → easykashRef
-      // Note: we store ProductCode as transaction_id at initiate time (not easykashRef).
-      let customData: {
-        paymentId?: string;
-        orderId?: string;
-        userId?: string;
-      } = {};
-
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      if (data.customerReference) {
-        const ref = String(data.customerReference).trim();
-
-        // Preferred: plain paymentId GUID
-        if (uuidRegex.test(ref)) {
-          customData.paymentId = ref;
-        } else {
-          // Backward compat: old JSON customerReference
-          try {
-            const parsed = JSON.parse(ref);
-            if (parsed?.paymentId) {
-              customData = {
-                paymentId: parsed.paymentId,
-                orderId: parsed.orderId,
-                userId: parsed.userId,
-              };
-            }
-          } catch {
-            console.log(
-              "customerReference is not JSON/UUID, will search by ProductCode"
-            );
-          }
-        }
+      if (!Number.isFinite(amount)) {
+        await fail(
+          "amount_mismatch",
+          new ApiError(400, "Invalid payment amount"),
+        );
       }
 
-      if (!customData.paymentId || !customData.orderId) {
-        const lookupKeys = [productCode, easykashRef, data.customerReference]
+      const referencePaymentId = this.extractReferencePaymentId(data);
+      const hasExplicitReference = Boolean(
+        data.customerReference || data.merchantReference,
+      );
+
+      if (hasExplicitReference && !referencePaymentId) {
+        // Non-UUID reference: resolve by exact id/transaction match only (single row)
+        const refValue = String(
+          data.customerReference || data.merchantReference,
+        ).trim();
+        const byRef = await pool
+          .request()
+          .input("lookupKey", sql.NVarChar(255), refValue).query(`
+            SELECT p.id, p.order_id
+            FROM payments p
+            WHERE CONVERT(NVARCHAR(36), p.id) = @lookupKey
+               OR p.transaction_id = @lookupKey
+          `);
+
+        if (byRef.recordset.length === 0) {
+          await fail(
+            "not_found",
+            new ApiError(404, "Payment not found for transaction ID"),
+          );
+        }
+        if (byRef.recordset.length > 1) {
+          await fail(
+            "ref_mismatch",
+            new ApiError(400, "Ambiguous payment reference"),
+          );
+        }
+        paymentId = byRef.recordset[0].id;
+        orderId = byRef.recordset[0].order_id;
+      } else if (referencePaymentId) {
+        paymentId = referencePaymentId;
+      } else {
+        // No customer/merchant reference — ProductCode / easykashRef only if unique
+        const lookupKeys = [productCode, easykashRef]
           .filter(Boolean)
           .map(String);
 
-        console.log("🔍 Resolving payment by keys:", lookupKeys);
+        if (lookupKeys.length === 0) {
+          await fail(
+            "not_found",
+            new ApiError(404, "Payment not found for transaction ID"),
+          );
+        }
 
+        let found: { id: string; order_id: string } | null = null;
         for (const key of lookupKeys) {
           const paymentSearchResult = await pool
             .request()
             .input("lookupKey", sql.NVarChar(255), key).query(`
-              SELECT TOP 1 p.*, o.status as order_status 
+              SELECT p.id, p.order_id
               FROM payments p
-              LEFT JOIN orders o ON p.order_id = o.id
               WHERE p.transaction_id = @lookupKey
                  OR CONVERT(NVARCHAR(36), p.id) = @lookupKey
             `);
 
-          if (paymentSearchResult.recordset.length > 0) {
-            const found = paymentSearchResult.recordset[0];
-            customData = {
-              paymentId: found.id,
-              orderId: found.order_id,
-              userId: found.user_id,
-            };
+          if (paymentSearchResult.recordset.length > 1) {
+            await fail(
+              "ref_mismatch",
+              new ApiError(400, "Ambiguous payment reference"),
+            );
+          }
+          if (paymentSearchResult.recordset.length === 1) {
+            found = paymentSearchResult.recordset[0];
             break;
           }
         }
 
-        if (!customData.paymentId || !customData.orderId) {
-          throw new ApiError(404, "Payment not found for transaction ID");
+        if (!found) {
+          await fail(
+            "not_found",
+            new ApiError(404, "Payment not found for transaction ID"),
+          );
         }
+        paymentId = found!.id;
+        orderId = found!.order_id;
       }
 
-      // If we only have paymentId from GUID customerReference, load order_id
-      if (customData.paymentId && !customData.orderId) {
-        const byId = await pool
-          .request()
-          .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
-          .query(`
-            SELECT p.*, o.status as order_status 
-            FROM payments p
+      const mapped = this.mapEasyKashStatus(status);
+      mappedStatus = mapped.paymentStatus;
+
+      if (!mapped.known) {
+        logger.warn("Unknown payment status from EasyKash", {
+          status,
+          requestId,
+        });
+      }
+
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+
+      try {
+        const locked = await new sql.Request(transaction)
+          .input("paymentId", sql.UniqueIdentifier, paymentId!).query(`
+            SELECT p.*, o.status as order_status
+            FROM payments p WITH (UPDLOCK, ROWLOCK)
             LEFT JOIN orders o ON p.order_id = o.id
             WHERE p.id = @paymentId
           `);
 
-        if (byId.recordset.length === 0) {
-          throw new ApiError(404, "Payment not found");
+        if (locked.recordset.length === 0) {
+          await transaction.rollback();
+          await fail("not_found", new ApiError(404, "Payment not found"));
         }
 
-        customData.orderId = byId.recordset[0].order_id;
-        customData.userId = byId.recordset[0].user_id;
-      }
+        const payment = locked.recordset[0];
+        paymentId = payment.id;
+        orderId = payment.order_id;
 
-      // Get payment record
-      const paymentResult = await pool
-        .request()
-        .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
-        .input("productCode", sql.NVarChar(255), productCode || null)
-        .input("easykashRef", sql.NVarChar(255), easykashRef || null).query(`
-          SELECT p.*, o.status as order_status 
-          FROM payments p
-          LEFT JOIN orders o ON p.order_id = o.id
-          WHERE p.id = @paymentId
-             OR (@productCode IS NOT NULL AND p.transaction_id = @productCode)
-             OR (@easykashRef IS NOT NULL AND p.transaction_id = @easykashRef)
-        `);
+        // Explicit reference must match resolved payment id fully
+        if (hasExplicitReference && referencePaymentId) {
+          if (
+            String(payment.id).toLowerCase() !==
+            String(referencePaymentId).toLowerCase()
+          ) {
+            await transaction.rollback();
+            await fail(
+              "ref_mismatch",
+              new ApiError(400, "Payment reference does not match payment"),
+            );
+          }
+        }
 
-      if (paymentResult.recordset.length === 0) {
-        throw new ApiError(404, "Payment not found");
-      }
+        if (Math.abs(Number(payment.amount) - amount) > 0.01) {
+          await transaction.rollback();
+          await fail(
+            "amount_mismatch",
+            new ApiError(400, "Payment amount does not match"),
+          );
+        }
 
-      const payment = paymentResult.recordset[0];
-      customData.paymentId = payment.id;
-      customData.orderId = payment.order_id;
+        const callbackCurrency = data.Currency || data.currency;
+        if (callbackCurrency) {
+          const expected = String(payment.currency || "EGP").toUpperCase();
+          if (String(callbackCurrency).trim().toUpperCase() !== expected) {
+            await transaction.rollback();
+            await fail(
+              "currency_mismatch",
+              new ApiError(400, "Payment currency does not match"),
+            );
+          }
+        }
 
-      // Map EasyKash status to our status
-      let paymentStatus: string;
-      let orderStatus: string | null = null;
+        const currentStatus = String(payment.status || "pending").toLowerCase();
+        let nextStatus = mapped.paymentStatus;
 
-      switch (status.toLowerCase()) {
-        // Success states
-        case "success":
-        case "completed":
-        case "paid":
-        case "delivered": // EasyKash: payment delivered successfully
-          paymentStatus = "completed";
-          orderStatus = "confirmed"; // Update order status to confirmed
-          break;
+        if (!mapped.known && currentStatus !== "pending") {
+          await transaction.rollback();
+          await fail(
+            "unknown_status",
+            new ApiError(409, "Unknown payment status conflicts with current state"),
+            status,
+          );
+        }
 
-        // Failed states
-        case "failed":
-        case "declined":
-          paymentStatus = "failed";
-          break;
+        if (!this.isTransitionAllowed(currentStatus, nextStatus)) {
+          await transaction.rollback();
+          await fail(
+            "illegal_transition",
+            new ApiError(
+              409,
+              `Illegal payment status transition: ${currentStatus} -> ${nextStatus}`,
+            ),
+            status,
+          );
+        }
 
-        // Pending/New states
-        case "new": // EasyKash: payment just created
-        case "pending":
-          paymentStatus = "pending";
-          break;
+        // Idempotent no-op for same status
+        if (currentStatus === nextStatus) {
+          await transaction.commit();
+          await this.auditCallback(req, {
+            verification_result: hmac.insecureSkipped
+              ? "insecure_skipped"
+              : "ok",
+            received_status: status,
+            mapped_status: nextStatus,
+            request_id: requestId,
+            paymentId,
+            orderId,
+          });
+          return {
+            success: true,
+            paymentId,
+            orderId,
+            status: nextStatus,
+            requestId,
+          };
+        }
 
-        // Cancelled states
-        case "canceled": // EasyKash spelling (without 'led')
-        case "cancelled": // Our spelling (with 'led')
-          paymentStatus = "cancelled";
-          break;
+        const storedTransactionId =
+          easykashRef || productCode || payment.transaction_id;
 
-        // Refunded state
-        case "refunded": // EasyKash: payment was refunded
-          paymentStatus = "refunded";
-          break;
-
-        // Expired state
-        case "expired": // EasyKash: payment link/voucher expired
-          paymentStatus = "cancelled"; // Treat expired as cancelled
-          break;
-
-        default:
-          console.warn(`⚠️ Unknown payment status from EasyKash: ${status}`);
-          paymentStatus = "pending";
-      }
-
-      // Keep ProductCode if we have it; prefer easykashRef as canonical provider ref
-      const storedTransactionId = easykashRef || productCode || payment.transaction_id;
-
-      // Update payment record
-      await pool
-        .request()
-        .input("paymentId", sql.UniqueIdentifier, customData.paymentId)
-        .input("status", sql.NVarChar(50), paymentStatus)
-        .input("transactionId", sql.NVarChar(255), storedTransactionId)
-        .input("referenceNumber", sql.NVarChar(255), data.voucher || null)
-        .input("callbackData", sql.NVarChar(sql.MAX), JSON.stringify(data))
-        .query(`
-          UPDATE payments 
-          SET 
-            status = @status,
-            transaction_id = @transactionId,
-            reference_number = @referenceNumber,
-            callback_data = @callbackData,
-            updated_at = GETDATE()
-          WHERE id = @paymentId
-        `);
-
-      // Update order payment status and status based on payment result
-      if (paymentStatus === "completed") {
-        // Payment successful - mark order as paid and confirmed
-        await pool
-          .request()
-          .input("orderId", sql.UniqueIdentifier, customData.orderId)
-          .input("orderStatus", sql.NVarChar(20), orderStatus).query(`
-            UPDATE orders 
+        await new sql.Request(transaction)
+          .input("paymentId", sql.UniqueIdentifier, paymentId)
+          .input("status", sql.NVarChar(50), nextStatus)
+          .input("transactionId", sql.NVarChar(255), storedTransactionId)
+          .input("referenceNumber", sql.NVarChar(255), data.voucher || null)
+          .input("callbackData", sql.NVarChar(sql.MAX), JSON.stringify(data))
+          .query(`
+            UPDATE payments 
             SET 
-              payment_status = 'paid',
-              payment_method = 'easykash',
-              status = COALESCE(@orderStatus, status),
+              status = @status,
+              transaction_id = @transactionId,
+              reference_number = @referenceNumber,
+              callback_data = @callbackData,
               updated_at = GETDATE()
-            WHERE id = @orderId
+            WHERE id = @paymentId
           `);
-      } else if (
-        paymentStatus === "failed" ||
-        paymentStatus === "cancelled" ||
-        paymentStatus === "refunded"
-      ) {
-        // Payment failed, cancelled, or refunded - mark order as failed and cancel if pending
-        await pool
-          .request()
-          .input("orderId", sql.UniqueIdentifier, customData.orderId).query(`
-            UPDATE orders 
-            SET 
-              payment_status = 'failed',
-              status = CASE 
-                WHEN status = 'pending_payment' THEN 'cancelled'
-                ELSE status 
-              END,
-              updated_at = GETDATE()
-            WHERE id = @orderId
-          `);
-      }
-      // Note: If paymentStatus is "pending", we don't update the order
-      // to keep it in pending_payment state
 
-      if (
-        paymentStatus === "completed" ||
-        paymentStatus === "failed" ||
-        paymentStatus === "cancelled" ||
-        paymentStatus === "refunded"
-      ) {
-        emitOrderEvent("updated", { orderId: customData.orderId });
-      }
+        if (nextStatus === "completed") {
+          await new sql.Request(transaction)
+            .input("orderId", sql.UniqueIdentifier, orderId)
+            .input("orderStatus", sql.NVarChar(20), mapped.orderStatus).query(`
+              UPDATE orders 
+              SET 
+                payment_status = 'paid',
+                payment_method = 'easykash',
+                status = COALESCE(@orderStatus, status),
+                updated_at = GETDATE()
+              WHERE id = @orderId
+            `);
+        } else if (nextStatus === "refunded") {
+          await new sql.Request(transaction)
+            .input("orderId", sql.UniqueIdentifier, orderId).query(`
+              UPDATE orders 
+              SET 
+                payment_status = 'refunded',
+                updated_at = GETDATE()
+              WHERE id = @orderId
+            `);
+        } else if (nextStatus === "failed" || nextStatus === "cancelled") {
+          await new sql.Request(transaction)
+            .input("orderId", sql.UniqueIdentifier, orderId).query(`
+              UPDATE orders 
+              SET 
+                payment_status = 'failed',
+                status = CASE 
+                  WHEN status = 'pending_payment' THEN 'cancelled'
+                  ELSE status 
+                END,
+                updated_at = GETDATE()
+              WHERE id = @orderId
+            `);
+        }
 
-      return {
-        success: true,
-        paymentId: customData.paymentId,
-        orderId: customData.orderId,
-        status: paymentStatus,
-      };
+        await transaction.commit();
+
+        if (
+          nextStatus === "completed" ||
+          nextStatus === "failed" ||
+          nextStatus === "cancelled" ||
+          nextStatus === "refunded"
+        ) {
+          emitOrderEvent("updated", { orderId });
+        }
+
+        await this.auditCallback(req, {
+          verification_result: hmac.insecureSkipped
+            ? "insecure_skipped"
+            : "ok",
+          received_status: status,
+          mapped_status: nextStatus,
+          request_id: requestId,
+          paymentId,
+          orderId,
+        });
+
+        return {
+          success: true,
+          paymentId,
+          orderId,
+          status: nextStatus,
+          requestId,
+        };
+      } catch (inner: any) {
+        try {
+          await transaction.rollback();
+        } catch {
+          // already rolled back or never started
+        }
+        throw inner;
+      }
     } catch (error: any) {
-      console.error("Payment callback error:", error);
-
       if (error instanceof ApiError) {
         throw error;
       }
+      logger.error("Payment callback error:", error);
       throw new ApiError(500, `Failed to process callback: ${error.message}`);
     }
   }
@@ -622,13 +771,11 @@ export class PaymentService {
 
     const payment = result.recordset[0];
 
-    // Auto-expire pending payments after 30 minutes (no callback received)
     if (payment.status === "pending" && payment.minutes_elapsed >= 30) {
-      console.log(
-        `⏰ Payment ${paymentId} expired after ${payment.minutes_elapsed} minutes. Auto-cancelling...`
+      logger.info(
+        `Payment ${paymentId} expired after ${payment.minutes_elapsed} minutes. Auto-cancelling...`,
       );
 
-      // Update payment to cancelled
       await pool.request().input("paymentId", sql.UniqueIdentifier, paymentId)
         .query(`
           UPDATE payments 
@@ -638,7 +785,6 @@ export class PaymentService {
           WHERE id = @paymentId AND status = 'pending'
         `);
 
-      // Update order if still pending_payment
       await pool
         .request()
         .input("orderId", sql.UniqueIdentifier, payment.order_id).query(`
@@ -659,23 +805,29 @@ export class PaymentService {
 
     return {
       id: payment.id,
+      order_id: payment.order_id,
       orderId: payment.order_id,
       amount: payment.amount,
       currency: payment.currency,
       status: payment.status,
       provider: payment.provider,
+      transaction_id: payment.transaction_id,
       transactionId: payment.transaction_id,
+      reference_number: payment.reference_number,
       referenceNumber: payment.reference_number,
+      created_at: payment.created_at,
       createdAt: payment.created_at,
+      updated_at: payment.updated_at,
       updatedAt: payment.updated_at,
+      order_status: payment.order_status,
       orderStatus: payment.order_status,
+      order_payment_status: payment.order_payment_status,
       orderPaymentStatus: payment.order_payment_status,
+      minutes_elapsed: payment.minutes_elapsed,
+      minutesElapsed: payment.minutes_elapsed,
     };
   }
 
-  /**
-   * Get payment by order ID
-   */
   static async getPaymentByOrderId(orderId: string, userId?: string) {
     const request = pool
       .request()
@@ -701,12 +853,8 @@ export class PaymentService {
     return result.recordset[0];
   }
 
-  /**
-   * Cancel payment manually (when user returns without completing payment)
-   */
   static async cancelPayment(paymentId: string, userId?: string) {
     try {
-      // Get payment record
       const request = pool
         .request()
         .input("paymentId", sql.UniqueIdentifier, paymentId);
@@ -730,17 +878,13 @@ export class PaymentService {
 
       const payment = paymentResult.recordset[0];
 
-      // Only allow cancellation if payment is still pending
       if (payment.status !== "pending" && payment.status !== "processing") {
         throw new ApiError(
           400,
-          `Payment cannot be cancelled. Current status: ${payment.status}`
+          `Payment cannot be cancelled. Current status: ${payment.status}`,
         );
       }
 
-      console.log("🚫 Cancelling payment:", paymentId);
-
-      // Update payment status to cancelled
       await pool
         .request()
         .input("paymentId", sql.UniqueIdentifier, paymentId)
@@ -752,7 +896,6 @@ export class PaymentService {
           WHERE id = @paymentId
         `);
 
-      // Update order payment status to failed and cancel order
       await pool
         .request()
         .input("orderId", sql.UniqueIdentifier, payment.order_id).query(`
@@ -769,15 +912,13 @@ export class PaymentService {
 
       emitOrderEvent("updated", { orderId: payment.order_id });
 
-      console.log("✅ Payment cancelled successfully");
-
       return {
         success: true,
         paymentId: paymentId,
         status: "cancelled",
       };
     } catch (error: any) {
-      console.error("Cancel payment error:", error);
+      logger.error("Cancel payment error:", error);
 
       if (error instanceof ApiError) {
         throw error;
@@ -786,14 +927,11 @@ export class PaymentService {
     }
   }
 
-  /**
-   * Get all payments (admin)
-   */
   static async getAllPayments(
     page: number = 1,
     limit: number = 10,
     status?: string,
-    orderId?: string
+    orderId?: string,
   ) {
     const offset = (page - 1) * limit;
     const request = pool
@@ -833,7 +971,6 @@ export class PaymentService {
       FETCH NEXT @limit ROWS ONLY
     `);
 
-    // Get total count
     const countRequest = pool.request();
     if (status) {
       countRequest.input("status", status);

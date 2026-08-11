@@ -47,6 +47,7 @@ router.post(
 // Check if phone exists (public)
 router.post(
   "/check-phone",
+  authLimiter,
   validateBody(z.object({ phone: z.string().min(1) })),
   AuthController.checkPhoneExists,
 );
